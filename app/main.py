@@ -33,9 +33,11 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://meridian.vercel.app",
-        "https://meridian-git-*.vercel.app",
+        "https://meridian-app.vercel.app",
     ],
-    allow_origin_regex=r"https://meridian-git-.*\.vercel\.app",
+    # Vercel production + preview deploys of this project (deployment URLs
+    # are generated per-deploy, e.g. meridian-<hash>-azra-banos-projects).
+    allow_origin_regex=r"https://(meridian|merid)[a-z0-9-]*(-azra-banos-projects)?\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
