@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ApiError, post } from "@/lib/api";
+import { API_URL, ApiError, post } from "@/lib/api";
 import { RULE_EVIDENCE, RULE_RATIONALE } from "@/lib/ruleRationale";
 import type { ApproveResponse, TriageVerdict } from "@/lib/types";
 import { DispositionBadge, UrgencyBadge } from "@/components/badges";
@@ -28,6 +28,7 @@ export default function VerdictPanel({
   onUpdated: (v: TriageVerdict) => void;
 }) {
   const alreadyApproved = Boolean(verdict.approved_by);
+  const [notify, setNotify] = useState<ApproveResponse | null>(null);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -94,16 +95,64 @@ export default function VerdictPanel({
 
       <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
         {alreadyApproved ? (
-          <ApprovedSummary verdict={verdict} />
+          <>
+            <ApprovedSummary referralId={referralId} verdict={verdict} />
+            {notify && <CareTeamCard notify={notify} />}
+          </>
         ) : (
           <ApproveEscalateForms
             referralId={referralId}
             verdict={verdict}
             onUpdated={onUpdated}
+            onNotify={setNotify}
           />
         )}
       </div>
     </section>
+  );
+}
+
+const NOTIFY_LABELS: Record<string, string> = {
+  sent: "posted to the care-team channel",
+  skipped_no_webhook: "drafted — no Slack webhook configured in this demo, so here's exactly what would post",
+  skipped_below_threshold: "not sent — below the urgency threshold for pinging the channel",
+  blocked_by_output_filter: "blocked by the output filter (fail-closed)",
+  failed: "failed — the approval is unaffected",
+  created: "calendar event created",
+  skipped_no_slot: "no slot recorded, no event to create",
+};
+
+function CareTeamCard({ notify }: { notify: ApproveResponse }) {
+  // The CopilotKit lane made visible: what the system did for the care team
+  // the moment the nurse signed. The Slack text passed the no-diagnosis
+  // output filter before it was allowed anywhere near this card.
+  return (
+    <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Care team, closed loop
+      </p>
+      {notify.slack && (
+        <div className="mt-2">
+          <p className="text-xs text-slate-500">
+            <span className="font-semibold">Slack</span> — {NOTIFY_LABELS[notify.slack] ?? notify.slack}
+          </p>
+          {notify.slack_preview && (
+            <div className="mt-1.5 rounded-md border-l-4 border-emerald-500 bg-white px-3 py-2 font-mono text-xs leading-relaxed text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-300">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                #gi-triage
+              </p>
+              <p className="whitespace-pre-wrap">{notify.slack_preview}</p>
+            </div>
+          )}
+        </div>
+      )}
+      {notify.calendar && (
+        <p className="mt-2 text-xs text-slate-500">
+          <span className="font-semibold">Calendar</span> —{" "}
+          {NOTIFY_LABELS[notify.calendar] ?? notify.calendar}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -128,7 +177,20 @@ function googleCalendarUrl(verdict: TriageVerdict): string {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-function ApprovedSummary({ verdict }: { verdict: TriageVerdict }) {
+function ApprovedSummary({
+  referralId,
+  verdict,
+}: {
+  referralId: string;
+  verdict: TriageVerdict;
+}) {
+  // Backend-generated .ics: output-filtered and using the ACTUAL parsed slot
+  // time (unlike the Google prefill link below, which invents a placeholder
+  // time client-side). Only offered when a slot was booked and the backend
+  // produced one — no slot means nothing to download.
+  const icsUrl = verdict.booked_slot
+    ? `${API_URL}/referrals/${referralId}/verdicts/${verdict.id}/booking.ics`
+    : null;
   return (
     <div className="rounded-md bg-emerald-50 px-4 py-3 text-sm dark:bg-emerald-950">
       <p className="font-semibold text-emerald-800 dark:text-emerald-300">
@@ -162,14 +224,28 @@ function ApprovedSummary({ verdict }: { verdict: TriageVerdict }) {
           <dd className="break-all font-mono text-xs">{verdict.approval_hash}</dd>
         </div>
       </dl>
-      <a
-        href={googleCalendarUrl(verdict)}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-3 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
-      >
-        📅 Add to Google Calendar
-      </a>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a
+          href={googleCalendarUrl(verdict)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:hover:bg-slate-800"
+        >
+          📅 Add to Google Calendar
+        </a>
+        {icsUrl && (
+          <a
+            href={icsUrl}
+            // Backend serves this with an attachment Content-Disposition, so
+            // the browser downloads the .ics rather than navigating. Works
+            // with Apple Calendar, Outlook, Google — any calendar app.
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:hover:bg-slate-800"
+            title="Download an .ics file with the exact booked time — opens in any calendar app"
+          >
+            ⬇️ Download booking (.ics)
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -178,10 +254,12 @@ function ApproveEscalateForms({
   referralId,
   verdict,
   onUpdated,
+  onNotify,
 }: {
   referralId: string;
   verdict: TriageVerdict;
   onUpdated: (v: TriageVerdict) => void;
+  onNotify: (res: ApproveResponse) => void;
 }) {
   const [mode, setMode] = useState<"approve" | "escalate" | null>(null);
   const [actor, setActor] = useState("");
@@ -203,6 +281,7 @@ function ApproveEscalateForms({
         `/referrals/${referralId}/verdicts/${verdict.id}/approve`,
         { actor: actor.trim(), slot: slot.trim() || undefined }
       );
+      onNotify(res);
       onUpdated({
         ...verdict,
         approved_by: actor.trim(),

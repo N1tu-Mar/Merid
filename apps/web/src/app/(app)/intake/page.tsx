@@ -183,6 +183,11 @@ export default function IntakePage() {
                   <span className="text-slate-300 dark:text-slate-600">·</span>
                   <span className="font-medium">{result.disposition}</span>
                 </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  <span className="font-semibold uppercase tracking-wide text-slate-400">Insurance</span>{" "}
+                  {plan.name.replace(" (synthetic)", "")} · est. your share {plan.share} ·{" "}
+                  {plan.pa ? "prior auth required — Meridian handles it" : "no prior auth needed"}
+                </p>
                 {result.booked_slot ? (
                   <p className="mt-3 rounded-md bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                     Booked: {result.booked_slot}

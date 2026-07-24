@@ -49,6 +49,7 @@ export interface SandboxInfo {
 export interface ReferralWorklistItem {
   referral_id: string;
   patient_name: string;
+  coverage?: CoverageMatch;
   source: string;
   raw_text: string;
   created_at: string;
@@ -61,6 +62,12 @@ export interface ApproveResponse {
   status: string;
   approval_hash: string;
   approved_at: string;
+  // Care-team loop (CopilotKit lane): status of the Slack + calendar
+  // notifications fired after the signature commits. slack_preview carries
+  // the filtered message text when no webhook is configured (demo mode).
+  slack?: string;
+  slack_preview?: string | null;
+  calendar?: string;
 }
 
 export interface EscalateResponse {
