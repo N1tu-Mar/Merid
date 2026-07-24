@@ -362,7 +362,7 @@ def approve_verdict(referral_id: str, verdict_id: str, body: ApproveRequest) -> 
             approved_by=actor,
         )
 
-        return {
+        resp: dict = {
             "status": "approved",
             "approval_hash": approval_hash,
             "approved_at": approved_at.isoformat(),
@@ -370,6 +370,53 @@ def approve_verdict(referral_id: str, verdict_id: str, body: ApproveRequest) -> 
             "slack_preview": notify_result.get("preview"),
             "calendar": calendar_result.get("status"),
         }
+        # When a bookable .ics was produced, expose a download link. The event
+        # is created when a human opens the file in their calendar app —
+        # consistent with invariant #4 (the agent prepares, humans commit).
+        if calendar_result.get("status") == "generated":
+            resp["calendar_download"] = (
+                f"/referrals/{referral_id}/verdicts/{verdict_id}/booking.ics"
+            )
+        return resp
+    finally:
+        session.close()
+
+
+@app.get("/referrals/{referral_id}/verdicts/{verdict_id}/booking.ics")
+def download_booking_ics(referral_id: str, verdict_id: str):
+    """Serve the appointment as an .ics file for an approved verdict.
+
+    Regenerated on demand from the signed verdict rather than stored — the
+    verdict is the source of truth, and .ics generation is deterministic and
+    output-filtered. 404 if the verdict isn't approved or has no slot.
+    """
+    from fastapi.responses import Response
+
+    session = get_session()
+    try:
+        verdict = session.get(TriageVerdictRecord, verdict_id)
+        if not verdict or verdict.referral_id != referral_id:
+            raise HTTPException(404, "verdict not found")
+        if not verdict.approved_by:
+            raise HTTPException(409, "verdict not approved; nothing booked")
+
+        result = create_calendar_event(
+            referral_id=referral_id,
+            urgency=verdict.urgency,
+            booked_slot=verdict.booked_slot,
+            approved_by=verdict.approved_by,
+        )
+        if result.get("status") != "generated":
+            raise HTTPException(
+                422, f"no bookable appointment: {result.get('status')}"
+            )
+        return Response(
+            content=result["ics"],
+            media_type="text/calendar",
+            headers={
+                "Content-Disposition": f'attachment; filename="{referral_id}.ics"'
+            },
+        )
     finally:
         session.close()
 

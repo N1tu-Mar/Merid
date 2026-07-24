@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ApiError, post } from "@/lib/api";
+import { API_URL, ApiError, post } from "@/lib/api";
 import { RULE_EVIDENCE, RULE_RATIONALE } from "@/lib/ruleRationale";
 import type { ApproveResponse, TriageVerdict } from "@/lib/types";
 import { DispositionBadge, UrgencyBadge } from "@/components/badges";
@@ -96,7 +96,7 @@ export default function VerdictPanel({
       <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
         {alreadyApproved ? (
           <>
-            <ApprovedSummary verdict={verdict} />
+            <ApprovedSummary referralId={referralId} verdict={verdict} />
             {notify && <CareTeamCard notify={notify} />}
           </>
         ) : (
@@ -177,7 +177,20 @@ function googleCalendarUrl(verdict: TriageVerdict): string {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-function ApprovedSummary({ verdict }: { verdict: TriageVerdict }) {
+function ApprovedSummary({
+  referralId,
+  verdict,
+}: {
+  referralId: string;
+  verdict: TriageVerdict;
+}) {
+  // Backend-generated .ics: output-filtered and using the ACTUAL parsed slot
+  // time (unlike the Google prefill link below, which invents a placeholder
+  // time client-side). Only offered when a slot was booked and the backend
+  // produced one — no slot means nothing to download.
+  const icsUrl = verdict.booked_slot
+    ? `${API_URL}/referrals/${referralId}/verdicts/${verdict.id}/booking.ics`
+    : null;
   return (
     <div className="rounded-md bg-emerald-50 px-4 py-3 text-sm dark:bg-emerald-950">
       <p className="font-semibold text-emerald-800 dark:text-emerald-300">
@@ -211,14 +224,28 @@ function ApprovedSummary({ verdict }: { verdict: TriageVerdict }) {
           <dd className="break-all font-mono text-xs">{verdict.approval_hash}</dd>
         </div>
       </dl>
-      <a
-        href={googleCalendarUrl(verdict)}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-3 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
-      >
-        📅 Add to Google Calendar
-      </a>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a
+          href={googleCalendarUrl(verdict)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:hover:bg-slate-800"
+        >
+          📅 Add to Google Calendar
+        </a>
+        {icsUrl && (
+          <a
+            href={icsUrl}
+            // Backend serves this with an attachment Content-Disposition, so
+            // the browser downloads the .ics rather than navigating. Works
+            // with Apple Calendar, Outlook, Google — any calendar app.
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:hover:bg-slate-800"
+            title="Download an .ics file with the exact booked time — opens in any calendar app"
+          >
+            ⬇️ Download booking (.ics)
+          </a>
+        )}
+      </div>
     </div>
   );
 }
