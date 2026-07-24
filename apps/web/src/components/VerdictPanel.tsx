@@ -107,6 +107,27 @@ export default function VerdictPanel({
   );
 }
 
+function googleCalendarUrl(verdict: TriageVerdict): string {
+  // Prefilled Google Calendar event (no OAuth needed): the demo booking is
+  // synthetic, so the event is stamped next-day 9:00-9:30 with the
+  // human-readable slot label in the details. What the demo shows is real:
+  // an approved verdict lands on an actual calendar in one click.
+  const base = verdict.approved_at ? new Date(verdict.approved_at) : new Date();
+  const start = new Date(base);
+  start.setDate(start.getDate() + 1);
+  start.setHours(9, 0, 0, 0);
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const fmt = (d: Date) =>
+    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: "GI appointment (Meridian DEMO — synthetic)",
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `Slot: ${verdict.booked_slot ?? "per clinic schedule"}\nApproved by: ${verdict.approved_by}\nDEMO — synthetic data. Not for clinical use.`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 function ApprovedSummary({ verdict }: { verdict: TriageVerdict }) {
   return (
     <div className="rounded-md bg-emerald-50 px-4 py-3 text-sm dark:bg-emerald-950">
@@ -141,6 +162,14 @@ function ApprovedSummary({ verdict }: { verdict: TriageVerdict }) {
           <dd className="break-all font-mono text-xs">{verdict.approval_hash}</dd>
         </div>
       </dl>
+      <a
+        href={googleCalendarUrl(verdict)}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+      >
+        📅 Add to Google Calendar
+      </a>
     </div>
   );
 }

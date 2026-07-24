@@ -21,7 +21,7 @@ export default function NavBar() {
             Meridian
           </span>
           <span className="hidden text-xs font-medium text-slate-400 sm:inline">
-            referral triage, not diagnosis
+            books the scope · never plays doctor
           </span>
         </Link>
         <ul className="flex items-center gap-1">

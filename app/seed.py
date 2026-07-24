@@ -69,8 +69,70 @@ def seed() -> None:
                 f"disposition={verdict.disposition} rules={verdict.rules_fired}"
             )
         session.commit()
+
+        _seed_pa_packet(session)
     finally:
         session.close()
+
+
+def _seed_pa_packet(session) -> None:
+    """Seed one drafted PA packet (for the elderly-IDA case) so the PA page
+    demos mid-flow: physician approval is the next click, not three steps of
+    setup. The nurse approval it rests on is seeded synthetic data, clearly
+    attributed — the live demo path still walks the full chain by hand."""
+    import json as _json
+
+    from app.approval import sign
+    from app.db import PAPacketRecord
+    from app.schemas import ReferralFeatures, TriageVerdict
+    from services.priorauth.draft import draft_packet
+
+    packet_id = "seed-packet-elderly-ida"
+    if session.get(PAPacketRecord, packet_id):
+        return
+
+    ref = session.get(ReferralRecord, "elderly-ida")
+    if not ref:
+        return
+    verdict = (
+        session.query(TriageVerdictRecord)
+        .filter(TriageVerdictRecord.referral_id == ref.id)
+        .first()
+    )
+    if not verdict or verdict.approved_by:
+        return
+
+    actor, approved_at, approval_hash = sign(
+        "Seed Nurse (synthetic)",
+        {"verdict_id": verdict.id, "referral_id": ref.id, "urgency": verdict.urgency},
+    )
+    verdict.approved_by = actor
+    verdict.approved_at = approved_at
+    verdict.approval_hash = approval_hash
+    verdict.booked_slot = "Urgent GI clinic — tomorrow at 10:00 AM"
+
+    features = ReferralFeatures.model_validate_json(ref.features_json)
+    tv = TriageVerdict(
+        referral_id=verdict.referral_id,
+        urgency=verdict.urgency,
+        disposition=verdict.disposition,
+        rules_fired=verdict.rules_fired,
+        rule_version=verdict.rule_version,
+        missing_features=verdict.missing_features,
+        created_at=verdict.created_at,
+    )
+    sentences, _dropped = draft_packet(features, tv)
+    session.add(
+        PAPacketRecord(
+            id=packet_id,
+            referral_id=ref.id,
+            verdict_id=verdict.id,
+            sentences_json=_json.dumps([s.model_dump() for s in sentences]),
+            status="drafted",
+        )
+    )
+    session.commit()
+    print(f"seeded PA packet {packet_id} (drafted, awaiting physician approval)")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ApiError, get } from "@/lib/api";
-import type { ReferralWorklistItem, TriageVerdict } from "@/lib/types";
+import type { CoverageMatch, ReferralWorklistItem, TriageVerdict } from "@/lib/types";
 import FeatureTable from "@/components/FeatureTable";
 import VerdictPanel from "@/components/VerdictPanel";
 import { SandboxBadge } from "@/components/badges";
@@ -22,10 +22,18 @@ export default function ReferralDetailPage() {
   const params = useParams<{ id: string }>();
   const referralId = params.id;
   const [item, setItem] = useState<ReferralWorklistItem | null>(null);
+  const [coverage, setCoverage] = useState<CoverageMatch | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    get<CoverageMatch>(`/referrals/${referralId}/coverage`)
+      .then((data) => {
+        if (!cancelled) setCoverage(data);
+      })
+      .catch(() => {
+        /* coverage card simply doesn't render */
+      });
     get<ReferralWorklistItem>(`/referrals/${referralId}`)
       .then((data) => {
         if (!cancelled) setItem(data);
@@ -91,6 +99,35 @@ export default function ReferralDetailPage() {
             </h2>
             <FeatureTable features={item.features} />
           </div>
+
+          {coverage && (
+            <div>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Insurance match{" "}
+                <span className="normal-case text-slate-400">
+                  — runs after the clinical verdict; can never change urgency
+                </span>
+              </h2>
+              <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                  <span className="font-semibold">{coverage.plan}</span>
+                  <span
+                    className={
+                      coverage.pa_required ? "text-amber-700" : "text-emerald-700"
+                    }
+                  >
+                    {coverage.pa_required ? "Prior auth required" : "No prior auth needed"}
+                  </span>
+                  <span className="text-slate-500">
+                    est. patient share {coverage.est_patient_share}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {coverage.note} → {coverage.next_step}
+                </p>
+              </div>
+            </div>
+          )}
 
           <div>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">

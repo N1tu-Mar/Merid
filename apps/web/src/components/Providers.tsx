@@ -20,8 +20,17 @@ import { CopilotKit } from "@copilotkit/react-core";
  * the deterministic rule engine (see CLAUDE.md, "LLMs extract. Rules decide.").
  */
 export default function Providers({ children }: { children: React.ReactNode }) {
+  // Gate: the provider only mounts when the deployment says the runtime is
+  // actually backed by a key (NEXT_PUBLIC_COPILOT_ENABLED=true AND
+  // FIREWORKS_API_KEY set where the /api/copilotkit route runs). Without the
+  // flag, the route's {data:null} fallback makes the CopilotKit client throw
+  // "Cannot convert undefined or null to object" as a red toast on every
+  // page — a silent no-op provider is not actually a no-op.
+  if (process.env.NEXT_PUBLIC_COPILOT_ENABLED !== "true") {
+    return <>{children}</>;
+  }
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit">
+    <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
       {children}
     </CopilotKit>
   );

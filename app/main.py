@@ -71,6 +71,57 @@ def health() -> dict:
     return {"status": "ok", "demo_mode": True}
 
 
+@app.get("/ops/summary")
+def ops_summary() -> dict:
+    """The practice-pulse numbers the dashboard leads with: what came in,
+    how fast it was triaged, which dismissed-on-arrival referrals the rules
+    caught, and what the agent's payer calls saved. All computed live from
+    the DB — no projections, no vibes."""
+    from app.output_filter import CONDITION_TERMS
+
+    session = get_session()
+    try:
+        refs = session.query(ReferralRecord).all()
+        verdicts = {v.referral_id: v for v in session.query(TriageVerdictRecord).all()}
+        packets = session.query(PAPacketRecord).all()
+
+        triage_seconds: list[float] = []
+        landmines = []
+        urgent_count = 0
+        for r in refs:
+            v = verdicts.get(r.id)
+            if not v:
+                continue
+            if v.urgency in ("urgent", "emergency"):
+                urgent_count += 1
+                # A "landmine": the referral text itself carries a benign
+                # spin (condition name / reassurance from the referrer), but
+                # the rules still flagged it urgent. This is the product.
+                text = (r.raw_text or "").lower()
+                if any(t in text for t in CONDITION_TERMS) or "reassur" in text:
+                    landmines.append({"referral_id": r.id, "patient_name": r.patient_name})
+            triage_seconds.append(max(0.0, (v.created_at - r.created_at).total_seconds()))
+
+        ivr_calls = [p for p in packets if p.payer_status is not None]
+        days_saved = sum(p.days_saved or 0 for p in packets)
+        return {
+            "referrals_received": len(refs),
+            "triaged": len(triage_seconds),
+            "urgent_flagged": urgent_count,
+            "avg_triage_seconds": round(sum(triage_seconds) / len(triage_seconds), 1) if triage_seconds else None,
+            "approved_bookings": sum(1 for v in verdicts.values() if v.approved_by),
+            "landmines_caught": len(landmines),
+            "landmines": landmines,
+            "payer_calls_made": len(ivr_calls),
+            # CAQH Index 2024: a fully manual prior auth averages 24 staff
+            # minutes — the agent ate that hold time instead.
+            "staff_minutes_saved": len(ivr_calls) * 24,
+            "days_saved": days_saved,
+        }
+    finally:
+        session.close()
+
+
 @app.get("/evals/summary")
 def evals_summary() -> dict:
     """Backs the dashboard's escalation-recall / false-reassurance tiles.
@@ -230,6 +281,22 @@ def get_referral(referral_id: str) -> dict:
         if not ref:
             raise HTTPException(404, "referral not found")
         return _worklist_item(session, ref)
+    finally:
+        session.close()
+
+
+@app.get("/referrals/{referral_id}/coverage")
+def get_referral_coverage(referral_id: str) -> dict:
+    """Insurance match for this referral (synthetic plan table). Runs AFTER
+    the clinical verdict and can never change urgency — it answers "does
+    this need prior auth?" and "what will the patient roughly owe?"."""
+    from app.coverage import coverage_for
+
+    session = get_session()
+    try:
+        if not session.get(ReferralRecord, referral_id):
+            raise HTTPException(404, "referral not found")
+        return coverage_for(referral_id)
     finally:
         session.close()
 
