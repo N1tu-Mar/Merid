@@ -5,6 +5,12 @@ prior authorization approved. It never diagnoses — it decides exactly one thin
 this person need a GI appointment, and how fast.** See `CLAUDE.md` for the full spec and
 the non-negotiable invariants this codebase enforces in code, not prompts.
 
+> **This repo (`N1tu-Mar/Merid`) is the canonical home.** It carries the full
+> history migrated from `N1tu-Mar/daytona` — rule engine + sandboxed referral
+> pipeline + worklist (foundation), plus the voice layer, Braintrust
+> evals/tracing, evidence-grounded rules, verified fact sheet
+> ([docs/FACTS.md](docs/FACTS.md)), and the landing page.
+
 > **DEMO — synthetic data. Not for clinical use.**
 
 ## What it does
@@ -211,18 +217,25 @@ build tooling and are not reachable in this demo. **Do not run
 Stop it (`Ctrl+C`) and re-run `npm run build && npm start`, then hard-refresh
 the browser (`Cmd/Ctrl+Shift+R`).
 
-## A note on the frontend (no CopilotKit)
+## Team workstreams (hackathon day)
 
-The frontend was originally scaffolded with CopilotKit, but nothing in the app
-was ever wired to it — no chat, no `useCopilotReadable`, no actions. With no
-LLM adapter provisioned, the only thing the CopilotKit provider did was a
-runtime/agent-discovery handshake against an adapter-less route, which threw
-`CopilotApiDiscoveryError` and broke page rendering ("This page couldn't
-load"). Since it added no function and broke the app, it was removed from the
-render path — the frontend is now plain Next.js + Tailwind talking to the
-backend over `fetch`. `src/components/Providers.tsx` and
-`src/app/api/copilotkit/route.ts` document how to reinstate a real copilot
-(with an LLM adapter) if you want one later.
+- **Voice + evals + safety spine** (this history): ElevenLabs intake/IVR
+  audio, Braintrust tracing + experiments, evidence-grounded rules, landing.
+- **Fireworks / non-voice pipeline**: teammates own extraction hardening and
+  the non-call, non-ElevenLabs flows. Extraction model choice is
+  eval-driven — before changing `FIREWORKS_MODEL`, run
+  `python -m evals.extraction_ab` and let the Braintrust diff decide.
+- **CopilotKit — doctor's-office integrations**: teammates are wiring the
+  clinic-facing copilot (calendar booking, Slack notifications to the care
+  team). Ground rules so it composes with the invariants: the copilot may
+  *read* worklist state and *prepare* actions, but anything patient-facing
+  goes through `app/output_filter.py`, urgency only ever moves through
+  `app/urgency.py`, and nothing books or notifies without the named human
+  approval the API already enforces. `src/components/Providers.tsx` and
+  `src/app/api/copilotkit/route.ts` are the reinstatement seams — the
+  provider was previously unplugged because an adapter-less CopilotKit route
+  threw `CopilotApiDiscoveryError` and broke rendering; wire a real LLM
+  adapter before re-enabling the provider.
 
 ## Deployment (Vercel)
 
