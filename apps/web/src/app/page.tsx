@@ -14,31 +14,38 @@ function Kicker({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Each step names the partner tech doing the work — the workflow IS the
+// sponsor integration map; nothing is a logo on a slide.
 const STEPS = [
   {
     n: "1",
-    title: "A fax or a phone call arrives",
-    body: "The two ways every GI referral shows up today. No new software for the referring doctor, no portal for the patient.",
+    title: "A call or a fax arrives",
+    tools: ["ElevenLabs", "Daytona"],
+    body: "Patients talk to a live voice agent (ElevenLabs). Faxes are opened inside a throwaway, internet-blocked sandbox (Daytona) that's destroyed seconds later — hostile documents never touch the system.",
   },
   {
     n: "2",
     title: "AI reads it — facts only",
-    body: "Inside a locked, throwaway sandbox. It pulls out age, symptoms, duration. It has no opinions and no authority.",
+    tools: ["Fireworks AI"],
+    body: "Fireworks extracts age, symptoms, duration, insurance — in about a second. It has no opinions and no authority; we raced two of their models and kept the winner, scorecard attached.",
   },
   {
     n: "3",
     title: "Rules set how fast",
-    body: "Ten auditable rules, thresholds measured on 2,093 real patients. Every verdict shows exactly which rule fired and the study behind it.",
+    tools: ["Braintrust"],
+    body: "Ten auditable rules, thresholds measured on 2,093 real patients, cited line by line. Braintrust grades the system on every change and traces every live decision — 100% of urgent cases caught.",
   },
   {
     n: "4",
     title: "A nurse clicks approve",
-    body: "The appointment books, lands on the calendar, and the patient hears back — same day, not week six.",
+    tools: ["CopilotKit"],
+    body: "The copilot drafts the calendar event and the Slack note to the care team; the nurse clicks send. The slot books with the patient's estimated cost already shown.",
   },
   {
     n: "5",
     title: "The paperwork fights itself",
-    body: "Prior auth drafts with every sentence sourced. The doctor signs. The agent dials the payer's phone tree and sits through the hold music.",
+    tools: ["ElevenLabs", "Braintrust"],
+    body: "Prior auth drafts with every sentence sourced. The doctor signs. The agent dials the payer's phone tree (ElevenLabs voice) and sits through the hold music — every step leaves a replayable trace.",
   },
 ];
 
@@ -49,10 +56,17 @@ export default function Home() {
 
       <header>
         <nav className="mx-auto flex max-w-4xl items-center justify-between px-6 py-6">
-          <span className="text-lg font-bold tracking-tight">
+          <span className="flex items-center gap-2.5 text-lg font-bold tracking-tight">
+            {/* Wordmark: a meridian line crossing a pulse — the route a
+                patient travels, kept alive. */}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="9" stroke="#0f172a" strokeWidth="1.8" />
+              <path d="M12 3c3.6 2.4 3.6 15.6 0 18" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M4 12h4l2-3 3 6 2-3h5" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
             Meridian
-            <span className="ml-3 hidden text-xs font-normal normal-case tracking-normal text-slate-400 sm:inline">
-              books the scope · never plays doctor
+            <span className="ml-1 hidden text-xs font-normal normal-case tracking-normal text-slate-400 sm:inline">
+              the end of &ldquo;please hold&rdquo;
             </span>
           </span>
           <div className="flex items-center gap-6 text-sm text-slate-500">
@@ -187,6 +201,13 @@ export default function Home() {
         {/* Slide 4 — the flow, steps 1-5 */}
         <section className="border-t border-slate-100 py-24">
           <Kicker>How it works</Kicker>
+          <h2 className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl">
+            AI reads. Rules decide. People sign.
+          </h2>
+          <p className="mt-3 max-w-xl text-sm text-slate-500">
+            Five steps, five partners — each one doing a job the demo would die
+            without.
+          </p>
           <div className="mt-12 space-y-0">
             {STEPS.map((s) => (
               <div
@@ -194,10 +215,67 @@ export default function Home() {
                 className="grid gap-2 border-t border-slate-100 py-7 first:border-t-0 sm:grid-cols-[4rem_16rem_1fr] sm:gap-6"
               >
                 <span className="text-2xl font-bold text-amber-500">{s.n}</span>
-                <h3 className="font-bold">{s.title}</h3>
+                <div>
+                  <h3 className="font-bold">{s.title}</h3>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {s.tools.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <p className="text-sm leading-relaxed text-slate-500">{s.body}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Slide 4a — two doors: patient side and clinic side */}
+        <section className="border-t border-slate-100 py-24">
+          <Kicker>One system, two doors</Kicker>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2">
+            <Link
+              href="/intake"
+              className="group rounded-2xl border border-amber-200 bg-amber-50/50 p-8 transition-colors hover:border-amber-300 hover:bg-amber-50"
+            >
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-600">
+                For the patient
+              </p>
+              <h3 className="mt-3 text-2xl font-bold tracking-tight">
+                Call. Answer. Pick a slot.
+              </h3>
+              <ul className="mt-4 space-y-2 text-sm leading-relaxed text-slate-600">
+                <li>Talk to the intake line — live voice, no hold music.</li>
+                <li>Evidence-based questions: symptoms, history, insurance.</li>
+                <li>See nearby options with your estimated cost, before you hang up.</li>
+              </ul>
+              <p className="mt-5 text-sm font-bold text-amber-700 group-hover:underline">
+                Try the patient side →
+              </p>
+            </Link>
+            <Link
+              href="/worklist"
+              className="group rounded-2xl border border-slate-200 bg-slate-50/60 p-8 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                For the clinic
+              </p>
+              <h3 className="mt-3 text-2xl font-bold tracking-tight">
+                A queue that argues its case.
+              </h3>
+              <ul className="mt-4 space-y-2 text-sm leading-relaxed text-slate-600">
+                <li>Every verdict shows the rule that fired and the study behind it.</li>
+                <li>Insurance matched, prior auth drafted, payer chased.</li>
+                <li>Nothing books or sends without a named human&apos;s signature.</li>
+              </ul>
+              <p className="mt-5 text-sm font-bold text-slate-700 group-hover:underline">
+                Open the clinic side →
+              </p>
+            </Link>
           </div>
         </section>
 
@@ -287,52 +365,12 @@ export default function Home() {
               </p>
             </div>
             <div>
-              <p className="text-6xl font-bold tracking-tight">0</p>
+              <p className="text-6xl font-bold tracking-tight">&lt;1s</p>
               <p className="mt-2 text-sm text-slate-500">
-                models trained on patient data — that&apos;s the point. The
-                medicine lives in rules you can read, not weights you can&apos;t.
+                from arrival to a cited triage verdict — against an industry
+                baseline measured in days on a fax pile.
               </p>
             </div>
-          </div>
-        </section>
-
-        {/* Slide 6b — the stack, each doing a real job */}
-        <section className="border-t border-slate-100 py-24">
-          <Kicker>Built on</Kicker>
-          <h2 className="mt-6 max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-            Five tools. Each one load-bearing.
-          </h2>
-          <div className="mt-10">
-            {[
-              {
-                name: "Daytona",
-                job: "Every fax is opened inside a throwaway, internet-blocked sandbox that's destroyed seconds later — hostile documents never touch our system. The worklist shows each sandbox ID as proof.",
-              },
-              {
-                name: "Fireworks AI",
-                job: "Reads messy referral text into structured facts in about a second. We raced two of their models on the same gold referrals and kept the winner — the choice ships with its scorecard.",
-              },
-              {
-                name: "ElevenLabs",
-                job: "Both phone legs: the patient intake line (talk to it live on the demo) and the payer hold-music call. Every spoken word passes the no-diagnosis filter before it reaches the voice.",
-              },
-              {
-                name: "Braintrust",
-                job: "Every live decision streams a replayable trace, and our test suite grades the system on every change: 100% of urgent cases caught, zero patients falsely reassured.",
-              },
-              {
-                name: "CopilotKit",
-                job: "The clinic-side copilot in the worklist — drafts the calendar event and the Slack note to the care team; a human still clicks send.",
-              },
-            ].map((s) => (
-              <div
-                key={s.name}
-                className="grid gap-1 border-t border-slate-100 py-6 first:border-t-0 sm:grid-cols-[12rem_1fr] sm:gap-6"
-              >
-                <p className="font-bold">{s.name}</p>
-                <p className="text-sm leading-relaxed text-slate-500">{s.job}</p>
-              </div>
-            ))}
           </div>
         </section>
 
@@ -362,7 +400,7 @@ export default function Home() {
 
       <footer className="border-t border-slate-100">
         <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-2 px-6 py-8 text-[11px] font-bold uppercase tracking-widest text-slate-400 sm:flex-row">
-          <span>Meridian — demo · synthetic data · not for clinical use</span>
+          <span>Meridian — the end of &ldquo;please hold&rdquo; · demo · synthetic data</span>
           <span>AI reads · rules decide · people sign</span>
         </div>
       </footer>
