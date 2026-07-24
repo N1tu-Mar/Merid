@@ -21,8 +21,11 @@ import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 
 const FIREWORKS_API_KEY = process.env.FIREWORKS_API_KEY;
+// Verified against the account: llama-v3p1-70b-instruct returns 404 ("Model
+// not found, inaccessible, and/or not deployed"), so every copilot message
+// failed. deepseek-v4-flash is the model the backend already uses for text.
 const FIREWORKS_MODEL =
-  process.env.COPILOT_MODEL || "accounts/fireworks/models/llama-v3p1-70b-instruct";
+  process.env.COPILOT_MODEL || "accounts/fireworks/models/deepseek-v4-flash";
 
 export const POST = async (req: NextRequest) => {
   if (!FIREWORKS_API_KEY) {

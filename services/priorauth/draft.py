@@ -12,6 +12,7 @@ we assigned ourselves.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
@@ -23,7 +24,18 @@ from app.schemas import PASentence, ReferralFeatures, TriageVerdict
 log = logging.getLogger("meridian.priorauth.draft")
 
 FIREWORKS_API_KEY = os.environ.get("FIREWORKS_API_KEY")
-FIREWORKS_MODEL = os.environ.get("FIREWORKS_MODEL", "accounts/fireworks/models/llama-v3p1-70b-instruct")
+# Its own env var, not the shared FIREWORKS_MODEL: this module and
+# services/referral/extract.py used to read the same one with different
+# defaults, so configuring the extractor silently reconfigured packet
+# drafting too — with a max_tokens budget sized for the other job.
+#
+# The old default (llama-v3p1-70b-instruct) 404s on the account: "Model not
+# found, inaccessible, and/or not deployed". Because _fireworks_sentence()
+# swallows failures and falls back to a template, that produced a packet
+# that rendered correctly while Fireworks prose silently never ran.
+FIREWORKS_MODEL = os.environ.get(
+    "FIREWORKS_DRAFT_MODEL", "accounts/fireworks/models/deepseek-v4-flash"
+)
 FIREWORKS_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
 TIMEOUT_SECONDS = 15.0
 
@@ -77,6 +89,19 @@ def _template_sentence(claim: Claim) -> str:
     return f"{label}: {claim.value}."
 
 
+# The model must hand back a sentence, not a monologue. Without a schema it
+# returns its own reasoning first ("We need to write a single short, plain
+# clinical-documentation sentence stating the fact...") and the token cap
+# truncates it mid-thought — text that carries no condition name, so the
+# output filter passes it, and it renders into a prior authorization letter.
+# Constrained decoding removes the failure mode rather than filtering it.
+_SENTENCE_SCHEMA = {
+    "type": "object",
+    "properties": {"sentence": {"type": "string"}},
+    "required": ["sentence"],
+}
+
+
 def _fireworks_sentence(claim: Claim) -> str | None:
     if not FIREWORKS_API_KEY:
         return None
@@ -84,19 +109,31 @@ def _fireworks_sentence(claim: Claim) -> str | None:
     prompt = (
         f"Write one short, plain clinical-documentation sentence stating this fact "
         f"for a prior authorization letter. State only the fact given — no diagnosis, "
-        f"no interpretation, no likelihood language. Fact: {label} = {claim.value!r}."
+        f"no interpretation, no likelihood language. Fact: {label} = {claim.value!r}. "
+        f'Return JSON: {{"sentence": "..."}}'
     )
     payload = {
         "model": FIREWORKS_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0,
-        "max_tokens": 80,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "PASentence", "schema": _SENTENCE_SCHEMA},
+        },
+        # Budget covers the JSON envelope, not just the sentence. Truncation
+        # here would yield invalid JSON, which falls back to the template —
+        # correct, but wasteful of a call we already paid for.
+        "max_tokens": 512,
     }
     headers = {"Authorization": f"Bearer {FIREWORKS_API_KEY}", "Content-Type": "application/json"}
     try:
         resp = httpx.post(FIREWORKS_URL, json=payload, headers=headers, timeout=TIMEOUT_SECONDS)
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
+        choice = resp.json()["choices"][0]
+        if choice.get("finish_reason") == "length":
+            raise ValueError("sentence truncated")
+        sentence = json.loads(choice["message"]["content"])["sentence"].strip()
+        return sentence or None
     except Exception:
         log.exception("fireworks_sentence_generation_failed_falling_back_to_template")
         return None
