@@ -87,7 +87,7 @@ def _seed_pa_packet(session) -> None:
     from app.schemas import ReferralFeatures, TriageVerdict
     from services.priorauth.draft import draft_packet
 
-    packet_id = "seed-packet-elderly-ida"
+    packet_id = "seed-packet-elderly-ida-b"  # id chosen so the mock payer status is "approved" — happy demo ending
     if session.get(PAPacketRecord, packet_id):
         return
 
@@ -103,7 +103,7 @@ def _seed_pa_packet(session) -> None:
         return
 
     actor, approved_at, approval_hash = sign(
-        "Seed Nurse (synthetic)",
+        "Nina Alvarez, RN (pre-seeded demo)",
         {"verdict_id": verdict.id, "referral_id": ref.id, "urgency": verdict.urgency},
     )
     verdict.approved_by = actor

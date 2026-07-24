@@ -83,7 +83,9 @@ export default function Home() {
           <h1 className="max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-7xl">
             You&apos;re doubled over, gripping your stomach.
             <br />
-            <span className="text-slate-400">&ldquo;Please hold.&rdquo;</span>
+            <span className="text-slate-400 line-through decoration-amber-500 decoration-[6px]">
+              &ldquo;Please hold.&rdquo;
+            </span>
           </h1>
           <p className="mt-8 max-w-xl text-lg leading-relaxed text-slate-500">
             Elevator music. A stranger who&apos;ll read your fax in three
