@@ -3,14 +3,10 @@
 import { CopilotKit } from "@copilotkit/react-core";
 
 /**
- * CopilotKit provider, backed by a real adapter in
- * src/app/api/copilotkit/route.ts (Fireworks via its OpenAI-compatible API).
+ * App providers.
  *
- * Scoped deliberately to the worklist detail page — the only place that uses
- * copilot hooks — rather than the root layout. Mounting it app-wide put the
- * whole CopilotKit bundle in every page's first load (landing included) and
- * fired a runtime discovery request on every hard navigation, for a feature
- * only one route uses.
+ * CopilotKit is mounted here and backed by a real adapter in
+ * src/app/api/copilotkit/route.ts (Fireworks via its OpenAI-compatible API).
  *
  * History worth knowing: a previous version mounted this provider against an
  * adapter-less route, which failed agent discovery with

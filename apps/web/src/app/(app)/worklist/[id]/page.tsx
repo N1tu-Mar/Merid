@@ -8,12 +8,12 @@ import { ApiError, get } from "@/lib/api";
 import type { ReferralWorklistItem, TriageVerdict } from "@/lib/types";
 import FeatureTable from "@/components/FeatureTable";
 import VerdictPanel from "@/components/VerdictPanel";
-import Providers from "@/components/Providers";
 import { SandboxBadge } from "@/components/badges";
 
-// CopilotKit (provider + sidebar UI) is by far the heaviest chunk on this
-// route. Loading it dynamically lets the referral itself paint first; the
-// copilot hydrates a moment later without blocking the page.
+// CopilotKit's sidebar UI is by far the heaviest chunk on this route.
+// Loading it dynamically lets the referral itself paint first; the copilot
+// hydrates a moment later without blocking the page. The CopilotKit provider
+// itself comes from (app)/layout.tsx.
 const WorklistCopilot = dynamic(() => import("@/components/WorklistCopilot"), {
   ssr: false,
 });
@@ -111,12 +111,8 @@ export default function ReferralDetailPage() {
 
           {/* Nurse copilot — reads this referral's verdict, dispatches
               approve/escalate with human confirmation. Mounted only once the
-              item has loaded so the readable context is never empty. The
-              CopilotKit provider lives here, not in the root layout: this is
-              the only route that uses it. */}
-          <Providers>
-            <WorklistCopilot item={item} onUpdated={handleVerdictUpdated} />
-          </Providers>
+              item has loaded so the readable context is never empty. */}
+          <WorklistCopilot item={item} onUpdated={handleVerdictUpdated} />
         </div>
       )}
     </div>
