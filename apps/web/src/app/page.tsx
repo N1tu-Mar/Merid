@@ -27,7 +27,7 @@ const STEPS = [
     n: "2",
     title: "AI reads it — facts only",
     tools: ["Fireworks AI"],
-    body: "Fireworks extracts age, symptoms, duration, insurance — in about a second. It has no opinions and no authority; we raced two of their models and kept the winner, scorecard attached.",
+    body: "Fireworks extracts age, symptoms, duration, insurance — in about a second, with a per-field confidence score that corroborates our deterministic transcript parser; low confidence fails to a human, never to a guess. Small, fast open models targeted per input type, called statelessly so no patient text sits in a model provider's records — and we raced two of them, scorecard attached.",
   },
   {
     n: "3",

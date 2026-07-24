@@ -235,10 +235,19 @@ the browser (`Cmd/Ctrl+Shift+R`).
 
 - **Voice + evals + safety spine** (this history): ElevenLabs intake/IVR
   audio, Braintrust tracing + experiments, evidence-grounded rules, landing.
-- **Fireworks / non-voice pipeline**: teammates own extraction hardening and
-  the non-call, non-ElevenLabs flows. Extraction model choice is
-  eval-driven — before changing `FIREWORKS_MODEL`, run
-  `python -m evals.extraction_ab` and let the Braintrust diff decide.
+- **Fireworks / non-voice pipeline**: teammates own extraction hardening.
+  The design story: our transcript labeling started as a deterministic
+  keyword parser (auditable, but brittle on edge-case phrasings), and
+  instead of naively letting an LLM free-associate, Fireworks provides a
+  *corroborating* targeted analysis — per-field extraction with a
+  per-field confidence score, and anything below threshold fails to a
+  human, never to a guess. Why Fireworks specifically: low-latency small
+  open models we can pick per input type, called statelessly so no
+  patient-shaped text sits in a model provider's records (pairs with
+  Daytona's self-destructing containers for a HIPAA-ready posture — the
+  demo itself is synthetic-only). Model choice is eval-driven — before
+  changing `FIREWORKS_MODEL`, run `python -m evals.extraction_ab` and let
+  the Braintrust diff decide.
 - **CopilotKit — doctor's-office integrations**: the nurse copilot
   (worklist sidebar), Slack notifications, and calendar/.ics are built.
   **Status: the LLM sidebar is feature-flagged OFF for the demo**
@@ -404,7 +413,7 @@ sentence without a source does not render.
 | Sponsor | Load-bearing job (not decoration) |
 |---|---|
 | Daytona | Ephemeral, `network_block_all` sandbox per referral — untrusted fax/PDF toolchains never run in-process; provenance badged in the UI |
-| Fireworks | Structured extraction (perception only, never judgment); model chosen by measured A/B, sub-second at the flash tier |
+| Fireworks | Perception, never judgment: per-field extraction with confidence scores that corroborate the deterministic parser (low confidence → human, not a guess). Chosen for low-latency small open models targeted per input type, called statelessly — no patient text retained by a model provider (HIPAA-ready posture with Daytona; demo is synthetic-only). Model picked by measured A/B, sub-second at the flash tier |
 | Braintrust | Traces of every live decision + deterministic-scorer experiments + the model-selection diff |
 | ElevenLabs | Both phone legs of the product — patient intake and payer IVR — with the safety filter enforced at the synthesizer boundary |
 
