@@ -3,11 +3,9 @@ import Link from "next/link";
 import { Newsreader } from "next/font/google";
 import DemoBanner from "@/components/DemoBanner";
 
-// Landing page. Server-rendered, no client JS — the product pages carry the
-// interactivity; this page carries the argument. Its own full-bleed dark
-// editorial layout (the light app shell lives in (app)/layout.tsx). Copy
-// rules: short sentences, numbers over adjectives, and no claim that isn't
-// enforced in code somewhere in this repo.
+// Landing page as a pitch, not a website: white, one idea per screen,
+// numbers over paragraphs. Every stat is verified against a primary source
+// in docs/FACTS.md — nothing renders here that isn't on that sheet.
 
 const newsreader = Newsreader({
   subsets: ["latin"],
@@ -16,99 +14,11 @@ const newsreader = Newsreader({
   variable: "--font-newsreader",
 });
 
-const NAV_LINKS = [
-  { href: "/intake", label: "Intake Line" },
-  { href: "/worklist", label: "Worklist" },
-  { href: "/pa-packets", label: "PA Packets" },
-  { href: "/dashboard", label: "Dashboard" },
-];
-
-// Every number here is verified against its primary source — see docs/FACTS.md.
-const PROBLEM_STATS = [
-  {
-    value: "91% → 17%",
-    label: "five-year survival for colorectal cancer, caught early versus late (SEER, 2016–2022)",
-  },
-  {
-    value: "40 days",
-    label: "average wait for a GI appointment — the longest of any specialty surveyed (AMN 2025)",
-  },
-  {
-    value: "34.8%",
-    label: "of 103,737 specialty-referral scheduling attempts at a large US health system became documented completed visits",
-  },
-];
-
-const STEPS = [
-  {
-    title: "A patient calls, or a fax arrives",
-    body: "The voice line asks eleven fixed questions. The fax is opened inside an isolated, network-blocked Daytona sandbox that is destroyed seconds later — untrusted documents never touch our process.",
-  },
-  {
-    title: "A model reads. It never decides.",
-    body: "Fireworks extracts structured facts: age, bleeding, duration, weight loss. Perception only. If extraction is uncertain, the case goes to a human — the model cannot lower a priority or clear a patient.",
-  },
-  {
-    title: "Versioned rules set the urgency",
-    body: "A plain config file of clinical red-flag rules — auditable in five minutes, unit-tested, zero model calls. The thresholds aren't invented: each rule cites measured epidemiology (CAPER's 2,093-patient primary-care cohort, NICE NG12, USPSTF), and a rule without a citation fails the build. Every verdict records exactly which rules fired and which version decided.",
-  },
-  {
-    title: "A person signs everything",
-    body: "A nurse approves every booking. A physician approves every prior-auth packet, then the agent dials the payer's phone tree and brings back the status. The agent prepares; humans commit.",
-  },
-];
-
-const SAFEGUARDS = [
-  "Urgency is monotonic — the system can raise it, never lower it. Property-tested.",
-  "No code path auto-clears a patient. Every failure routes to a human.",
-  "The voice cannot say a condition name. The output filter runs inside the speech synthesizer, fail-closed.",
-  "Nothing books without a named human's signature — recorded with a hash of what they approved.",
-  "A prior-auth sentence with no source does not render.",
-];
-
-const SPONSORS = [
-  {
-    name: "Daytona",
-    job: "Every scanned referral is parsed in an ephemeral, zero-egress sandbox, then the sandbox is destroyed. It's the blast door: fax and PDF toolchains are a classic attack surface, and here they never run in-process. The worklist badges each item with its sandbox ID as proof.",
-  },
-  {
-    name: "Fireworks AI",
-    job: "Structured extraction of clinical facts from messy text — perception, never judgment. The model was picked by a measured A/B (verdict preservation, hallucination rate, latency), not by default. Extraction runs in about a second.",
-  },
-  {
-    name: "Braintrust",
-    job: "Every live decision streams a full trace: sandbox → extraction → rules. Experiments score the rule engine — escalation recall 100%, false reassurance 0 — and diff the extraction models, so the model choice ships with its receipt.",
-  },
-  {
-    name: "ElevenLabs",
-    job: "Both phone legs of the product: the patient intake call and the payer IVR call, audible end to end. Every agent line passes the no-diagnosis filter before it reaches the synthesizer.",
-  },
-];
-
-const SHOTS = [
-  {
-    src: "/landing/intake-call.png",
-    alt: "The intake call: red flags elicited, urgent slot booked in the same call",
-    caption:
-      "The call books the appointment — a 42-year-old reports three weeks of bleeding; urgent slot, same call, transcript plays out loud.",
-  },
-  {
-    src: "/landing/worklist.png",
-    alt: "Nurse worklist with urgency verdicts, fired rules, and sandbox provenance",
-    caption:
-      "The nurse worklist — every verdict shows which rules fired; anything the pipeline couldn't assess says so honestly and waits for a human.",
-  },
-  {
-    src: "/landing/dashboard.png",
-    alt: "Safety evals dashboard: escalation recall 100%, false reassurance 0",
-    caption:
-      "Escalation recall 100%, false reassurance 0 — and over-triage reported honestly, because that's the error we chose.",
-  },
-];
+const serif = "font-[family-name:var(--font-newsreader)]";
 
 function Kicker({ children }: { children: React.ReactNode }) {
   return (
-    <p className="font-mono text-[11px] font-medium uppercase tracking-[0.25em] text-slate-500">
+    <p className="font-mono text-[11px] font-medium uppercase tracking-[0.3em] text-slate-400">
       {children}
     </p>
   );
@@ -116,200 +26,190 @@ function Kicker({ children }: { children: React.ReactNode }) {
 
 export default function Home() {
   return (
-    <div
-      className={`${newsreader.variable} min-h-screen bg-[#070c18] text-slate-300 selection:bg-amber-200 selection:text-slate-900`}
-    >
+    <div className={`${newsreader.variable} min-h-screen bg-white text-slate-900 selection:bg-amber-100`}>
       <DemoBanner />
 
-      {/* Nav */}
-      <header className="border-b border-white/10">
-        <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <span className="font-[family-name:var(--font-newsreader)] text-xl text-white">
-            Meridian
-          </span>
-          <div className="flex items-center gap-6">
-            {NAV_LINKS.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="text-sm text-slate-400 transition-colors hover:text-white"
-              >
-                {l.label}
-              </Link>
-            ))}
+      <header>
+        <nav className="mx-auto flex max-w-4xl items-center justify-between px-6 py-6">
+          <span className={`${serif} text-xl`}>Meridian</span>
+          <div className="flex items-center gap-6 text-sm text-slate-500">
+            <Link href="/intake" className="hover:text-slate-900">Intake Line</Link>
+            <Link href="/worklist" className="hover:text-slate-900">Worklist</Link>
+            <Link href="/dashboard" className="hover:text-slate-900">Dashboard</Link>
           </div>
         </nav>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6">
-        {/* Hero */}
-        <section className="py-24 sm:py-32">
+      <main className="mx-auto max-w-4xl px-6">
+        {/* Slide 1 — the story */}
+        <section className="flex min-h-[85vh] flex-col justify-center">
           <Kicker>Referral triage, not diagnosis</Kicker>
-          <h1 className="mt-8 font-[family-name:var(--font-newsreader)] text-5xl font-normal leading-[1.08] tracking-tight text-white sm:text-6xl">
+          <h1 className={`${serif} mt-8 text-5xl leading-[1.1] tracking-tight sm:text-7xl`}>
             A 42-year-old with rectal bleeding is told it&apos;s{" "}
-            <em className="text-amber-200/90">probably hemorrhoids.</em>
+            <em>probably hemorrhoids.</em>
           </h1>
-          <p className="mt-8 max-w-2xl text-lg font-light leading-relaxed text-slate-400">
-            Meridian is the agent that makes that miss impossible. It answers
-            one question — does this person need a GI appointment, and how
-            fast — books the slot, drafts the prior auth, and chases the
-            payer. It never diagnoses anyone. That&apos;s not a disclaimer;
-            it&apos;s the architecture.
+          <p className="mt-8 max-w-xl text-lg text-slate-500">
+            Meridian makes that miss impossible — and books the colonoscopy
+            before the call ends.
           </p>
-          <div className="mt-10 flex flex-wrap items-center gap-6">
+          <div className="mt-10 flex items-center gap-6">
             <Link
               href="/intake"
-              className="rounded-full bg-white px-6 py-3 text-sm font-medium text-slate-900 transition-colors hover:bg-amber-100"
+              className="rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-700"
             >
-              Hear a live call
+              Hear the call
             </Link>
-            <Link
-              href="/worklist"
-              className="text-sm text-slate-400 transition-colors hover:text-white"
-            >
-              See the worklist <span aria-hidden>→</span>
-            </Link>
+            <span className="text-sm text-slate-400">3-minute live demo</span>
           </div>
         </section>
 
-        {/* Problem */}
-        <section className="border-t border-white/10 py-20">
+        {/* Slide 2 — the problem, one number at a time */}
+        <section className="border-t border-slate-100 py-28">
           <Kicker>The problem</Kicker>
-          <h2 className="mt-6 max-w-2xl font-[family-name:var(--font-newsreader)] text-3xl leading-snug text-white sm:text-4xl">
+          <h2 className={`${serif} mt-6 text-4xl tracking-tight sm:text-5xl`}>
             The failure isn&apos;t medicine. <em>It&apos;s routing.</em>
           </h2>
-          <p className="mt-6 max-w-2xl leading-relaxed text-slate-400">
-            Colorectal cancer in adults under 50 is rising 3% a year, and 3 in
-            4 of those cases are found at an advanced stage. The miss is
-            mundane: a young patient&apos;s bleeding gets written off, the
-            referral sits in a fax queue, the prior auth adds weeks — 95% of
-            physicians say prior authorization delays care, and a four-week
-            treatment delay carries a 6–13% higher risk of death. None of that
-            needs a smarter doctor — it needs the right people to get scoped,
-            in the right order, faster.
-          </p>
-          <dl className="mt-14 grid gap-px overflow-hidden rounded-lg bg-white/10 sm:grid-cols-3">
-            {PROBLEM_STATS.map((s) => (
-              <div key={s.value} className="bg-[#070c18] p-8 sm:bg-[#0a1020]/60">
-                <dt className="sr-only">{s.label}</dt>
-                <dd className="font-[family-name:var(--font-newsreader)] text-4xl text-white">
-                  {s.value}
-                </dd>
-                <p className="mt-3 text-sm leading-relaxed text-slate-500">{s.label}</p>
-              </div>
-            ))}
-          </dl>
-        </section>
-
-        {/* How it works */}
-        <section className="border-t border-white/10 py-20">
-          <Kicker>How it works</Kicker>
-          <h2 className="mt-6 font-[family-name:var(--font-newsreader)] text-3xl leading-snug text-white sm:text-4xl">
-            Models read. Rules decide. <em>People sign.</em>
-          </h2>
-          <ol className="mt-14">
-            {STEPS.map((step, i) => (
-              <li
-                key={step.title}
-                className="grid gap-4 border-t border-white/10 py-8 first:border-t-0 sm:grid-cols-[6rem_16rem_1fr] sm:gap-8"
-              >
-                <span className="font-mono text-sm text-amber-200/60">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <h3 className="font-[family-name:var(--font-newsreader)] text-xl text-white">
-                  {step.title}
-                </h3>
-                <p className="text-sm leading-relaxed text-slate-400">{step.body}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        {/* Screenshots */}
-        <section className="border-t border-white/10 py-20">
-          <Kicker>The working system</Kicker>
-          <div className="mt-14 space-y-20">
-            {SHOTS.map((shot) => (
-              <figure key={shot.src}>
-                <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 p-1.5 shadow-2xl shadow-black/50">
-                  <div className="overflow-hidden rounded-lg">
-                    <Image src={shot.src} alt={shot.alt} width={1440} height={900} className="w-full" />
-                  </div>
-                </div>
-                <figcaption className="mx-auto mt-5 max-w-2xl text-center font-mono text-xs leading-relaxed text-slate-500">
-                  {shot.caption}
-                </figcaption>
-              </figure>
-            ))}
+          <div className="mt-16 space-y-14">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-10">
+              <span className={`${serif} min-w-[14rem] text-6xl tracking-tight`}>3 in 4</span>
+              <p className="max-w-md text-slate-500">
+                colorectal cancers in adults under 50 are caught at an advanced
+                stage — incidence is rising 3% a year.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-10">
+              <span className={`${serif} min-w-[14rem] text-6xl tracking-tight`}>91% → 17%</span>
+              <p className="max-w-md text-slate-500">
+                five-year survival, caught early versus late. Timing is the
+                outcome.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-10">
+              <span className={`${serif} min-w-[14rem] text-6xl tracking-tight`}>40 days</span>
+              <p className="max-w-md text-slate-500">
+                average wait for a GI appointment — the longest of any
+                specialty. The fax queue, phone tag, and prior auth are the
+                delay.
+              </p>
+            </div>
           </div>
         </section>
 
-        {/* Safeguards */}
-        <section className="border-t border-white/10 py-20">
-          <Kicker>Safeguards</Kicker>
-          <h2 className="mt-6 font-[family-name:var(--font-newsreader)] text-3xl leading-snug text-white sm:text-4xl">
-            Code, <em>not promises.</em>
+        {/* Slide 3 — the market */}
+        <section className="border-t border-slate-100 py-28">
+          <Kicker>The market</Kicker>
+          <h2 className={`${serif} mt-6 max-w-2xl text-4xl leading-tight tracking-tight sm:text-5xl`}>
+            Two-thirds of referrals never become <em>completed visits.</em>
           </h2>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-500">
-            Each of these is enforced by the type system, a filter, or a test
-            that fails the build — not by a prompt.
+          <p className="mt-8 max-w-xl text-lg text-slate-500">
+            Every one a GI practice recovers is a four-figure procedure it
+            already owns. Meridian converts the queue: referral to booked in
+            minutes, prior auth drafted, payer chased — while staff time on
+            hold goes to zero.
           </p>
-          <ul className="mt-12">
-            {SAFEGUARDS.map((s, i) => (
-              <li
-                key={s}
-                className="flex gap-6 border-t border-white/10 py-5 first:border-t-0"
-              >
-                <span className="font-mono text-sm text-amber-200/60">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <p className="leading-relaxed text-slate-300">{s}</p>
-              </li>
-            ))}
-          </ul>
         </section>
 
-        {/* Stack */}
-        <section className="border-t border-white/10 py-20">
-          <Kicker>The stack</Kicker>
-          <h2 className="mt-6 font-[family-name:var(--font-newsreader)] text-3xl leading-snug text-white sm:text-4xl">
-            Four tools, <em>each load-bearing.</em>
+        {/* Slide 4 — how */}
+        <section className="border-t border-slate-100 py-28">
+          <Kicker>How</Kicker>
+          <h2 className={`${serif} mt-6 text-4xl tracking-tight sm:text-5xl`}>
+            Models read. Rules decide. <em>People sign.</em>
           </h2>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-500">
-            Nothing here is a logo on a slide. Remove any one of these and a
-            specific, demonstrable capability disappears.
-          </p>
-          <dl className="mt-12">
-            {SPONSORS.map((sp) => (
-              <div
-                key={sp.name}
-                className="grid gap-3 border-t border-white/10 py-8 first:border-t-0 sm:grid-cols-[14rem_1fr] sm:gap-8"
-              >
-                <dt className="font-[family-name:var(--font-newsreader)] text-xl text-white">
-                  {sp.name}
-                </dt>
-                <dd className="text-sm leading-relaxed text-slate-400">{sp.job}</dd>
-              </div>
-            ))}
-          </dl>
+          <div className="mt-14 grid gap-10 sm:grid-cols-3">
+            <div>
+              <p className="font-mono text-xs text-amber-600">01</p>
+              <p className="mt-3 text-slate-600">
+                AI reads the fax and the phone call — inside a destroyed-on-exit
+                sandbox. It extracts facts. It has no opinions.
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-xs text-amber-600">02</p>
+              <p className="mt-3 text-slate-600">
+                Ten auditable rules set the urgency — thresholds measured on
+                2,093 real patients, cited line by line.
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-xs text-amber-600">03</p>
+              <p className="mt-3 text-slate-600">
+                A nurse signs every booking. A physician signs every prior
+                auth. The agent does the waiting, not the deciding.
+              </p>
+            </div>
+          </div>
         </section>
 
-        {/* Close */}
-        <section className="border-t border-white/10 py-24 text-center sm:py-32">
-          <p className="mx-auto max-w-3xl font-[family-name:var(--font-newsreader)] text-3xl leading-snug text-white sm:text-4xl">
+        {/* Slide 5 — one product shot */}
+        <section className="border-t border-slate-100 py-28">
+          <Kicker>The demo</Kicker>
+          <h2 className={`${serif} mt-6 text-4xl tracking-tight sm:text-5xl`}>
+            The call ends with an <em>appointment.</em>
+          </h2>
+          <figure className="mt-12">
+            <div className="overflow-hidden rounded-xl border border-slate-200 shadow-xl shadow-slate-200/60">
+              <Image
+                src="/landing/intake-call.png"
+                alt="Voice intake call booking an urgent GI slot in the same call"
+                width={1440}
+                height={900}
+                className="w-full"
+              />
+            </div>
+            <figcaption className="mt-4 text-center text-sm text-slate-400">
+              Live: the 42-year-old&apos;s call, audible, booked urgent — and the
+              voice physically cannot say a diagnosis.
+            </figcaption>
+          </figure>
+        </section>
+
+        {/* Slide 6 — proof */}
+        <section className="border-t border-slate-100 py-28">
+          <Kicker>Proof, not promises</Kicker>
+          <div className="mt-10 grid gap-12 sm:grid-cols-3">
+            <div>
+              <p className={`${serif} text-6xl tracking-tight`}>100%</p>
+              <p className="mt-2 text-sm text-slate-500">
+                escalation recall — every should-be-urgent case flagged
+              </p>
+            </div>
+            <div>
+              <p className={`${serif} text-6xl tracking-tight`}>0</p>
+              <p className="mt-2 text-sm text-slate-500">
+                patients falsely reassured — no code path auto-clears anyone
+              </p>
+            </div>
+            <div>
+              <p className={`${serif} text-6xl tracking-tight`}>2,093</p>
+              <p className="mt-2 text-sm text-slate-500">
+                real patients behind the rule thresholds — every rule cites its
+                study in the UI
+              </p>
+            </div>
+          </div>
+          <p className="mt-14 max-w-xl text-slate-500">
+            Every decision streams a replayable trace. The extraction model was
+            chosen by a measured A/B, not a vibe. Every number on this page has
+            a primary source.
+          </p>
+        </section>
+
+        {/* Slide 7 — close */}
+        <section className="flex min-h-[60vh] flex-col items-center justify-center border-t border-slate-100 text-center">
+          <p className={`${serif} max-w-3xl text-4xl leading-snug tracking-tight sm:text-5xl`}>
             We don&apos;t diagnose. We make sure the right people{" "}
-            <em className="text-amber-200/90">get scoped.</em>
+            <em>get scoped.</em>
           </p>
-          <div className="mt-10 flex justify-center gap-6">
+          <div className="mt-10 flex gap-4">
             <Link
               href="/intake"
-              className="rounded-full bg-white px-6 py-3 text-sm font-medium text-slate-900 transition-colors hover:bg-amber-100"
+              className="rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-700"
             >
               Try the demo
             </Link>
             <Link
               href="/dashboard"
-              className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-slate-300 transition-colors hover:border-white/40 hover:text-white"
+              className="rounded-full border border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 hover:border-slate-500"
             >
               See the evals
             </Link>
@@ -317,10 +217,10 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-white/10">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 px-6 py-8 font-mono text-[11px] tracking-wide text-slate-600 sm:flex-row">
+      <footer className="border-t border-slate-100">
+        <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-2 px-6 py-8 font-mono text-[11px] tracking-wide text-slate-400 sm:flex-row">
           <span>MERIDIAN — DEMO. SYNTHETIC DATA. NOT FOR CLINICAL USE.</span>
-          <span>LLMS EXTRACT · RULES DECIDE · HUMANS SIGN</span>
+          <span>MODELS READ · RULES DECIDE · PEOPLE SIGN</span>
         </div>
       </footer>
     </div>

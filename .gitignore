@@ -16,3 +16,4 @@ session*.md
 *.local.md
 .env.example
 demo.md
+.vercel
