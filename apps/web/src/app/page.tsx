@@ -67,15 +67,16 @@ export default function Home() {
         {/* Slide 1 — hook */}
         <section className="flex min-h-[80vh] flex-col justify-center">
           <h1 className="max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-7xl">
-            Cancer still travels
+            You&apos;re doubled over, gripping your stomach.
             <br />
-            <span className="text-slate-400">by fax.</span>
+            <span className="text-slate-400">&ldquo;Please hold.&rdquo;</span>
           </h1>
           <p className="mt-8 max-w-xl text-lg leading-relaxed text-slate-500">
-            Referrals sit in fax queues and phone tag while early-stage becomes
-            late-stage. Meridian answers the phone, reads the fax, and books
-            the colonoscopy in minutes — a human signs every step, and it
-            never, ever diagnoses.
+            Elevator music. A stranger who&apos;ll read your fax in three
+            weeks. Nobody who can tell you what it&apos;ll cost. Meridian ends
+            the hold music: it answers, triages you against real clinical
+            evidence, books the scope, and fights the insurance company — a
+            human signs every step, and it never diagnoses.
           </p>
           <div className="mt-10 flex items-center gap-6">
             <Link
@@ -113,6 +114,40 @@ export default function Home() {
                 cancer becomes a malpractice claim — and two-thirds of
                 referrals never even become completed visits.
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Slide 2b — what it looks like today */}
+        <section className="border-t border-slate-100 py-24">
+          <Kicker>Today</Kicker>
+          <h2 className="mt-6 max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            This is the current system, working as designed.
+          </h2>
+          <div className="mt-12 grid gap-12 sm:grid-cols-2">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-slate-400">
+                Without Meridian
+              </p>
+              <ul className="mt-4 space-y-3 text-sm leading-relaxed text-slate-500">
+                <li>Your referral is a fax in a tray. Someone keys it in on day 3.</li>
+                <li>Weeks of phone tag — 40 days on average before a GI even sees you.</li>
+                <li>Prior auth: 24 minutes of staff hold time per case, weeks on the calendar.</li>
+                <li>Your cost? Nobody can tell you until the bill arrives.</li>
+                <li>Two-thirds of referrals never become completed visits at all.</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-emerald-600">
+                With Meridian
+              </p>
+              <ul className="mt-4 space-y-3 text-sm leading-relaxed text-slate-600">
+                <li>The call is answered now; the fax is read in seconds.</li>
+                <li>Triage in under a second, against cited clinical evidence.</li>
+                <li>A nurse signs; the slot books straight onto the calendar.</li>
+                <li>Insurance matched up front: prior auth flagged, your rough share shown.</li>
+                <li>The agent drafts the paperwork and sits through the hold music.</li>
+              </ul>
             </div>
           </div>
         </section>
@@ -161,6 +196,49 @@ export default function Home() {
                 <span className="text-2xl font-bold text-amber-500">{s.n}</span>
                 <h3 className="font-bold">{s.title}</h3>
                 <p className="text-sm leading-relaxed text-slate-500">{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Slide 4b — how we triage: the receipt */}
+        <section className="border-t border-slate-100 py-24">
+          <Kicker>How we triage — one real case</Kicker>
+          <h2 className="mt-6 max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            Every verdict is a receipt, not a vibe.
+          </h2>
+          <div className="mt-10 overflow-hidden rounded-xl border border-slate-200">
+            {[
+              {
+                k: "Facts extracted",
+                v: "Age 42 · rectal bleeding, 3 weeks · change in bowel habit. The AI reads; it adds nothing.",
+              },
+              {
+                k: "Rule fired",
+                v: "Under 50 + bleeding + a second red flag → URGENT. Threshold measured on 2,093 real patients (Hamilton 2005; NICE NG12) — the citation shows in the app.",
+              },
+              {
+                k: "Fail-safe",
+                v: "Anything missing or unclear routes to a human. There is no code path that tells a patient they're fine.",
+              },
+              {
+                k: "Insurance matched",
+                v: "Plan identified · prior auth required → packet drafts itself · estimated patient share shown up front. Coverage can never change urgency — money never outranks medicine.",
+              },
+              {
+                k: "Human signs",
+                v: "Nurse approves → slot books to the calendar. Physician approves → prior auth goes out, and the agent chases the payer by phone.",
+              },
+            ].map((row, i) => (
+              <div
+                key={row.k}
+                className="grid gap-1 border-t border-slate-100 px-6 py-5 first:border-t-0 sm:grid-cols-[12rem_1fr] sm:gap-6"
+              >
+                <p className="text-sm font-bold">
+                  <span className="mr-2 text-amber-500">{i + 1}</span>
+                  {row.k}
+                </p>
+                <p className="text-sm leading-relaxed text-slate-500">{row.v}</p>
               </div>
             ))}
           </div>
@@ -215,6 +293,46 @@ export default function Home() {
                 medicine lives in rules you can read, not weights you can&apos;t.
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* Slide 6b — the stack, each doing a real job */}
+        <section className="border-t border-slate-100 py-24">
+          <Kicker>Built on</Kicker>
+          <h2 className="mt-6 max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            Five tools. Each one load-bearing.
+          </h2>
+          <div className="mt-10">
+            {[
+              {
+                name: "Daytona",
+                job: "Every fax is opened inside a throwaway, internet-blocked sandbox that's destroyed seconds later — hostile documents never touch our system. The worklist shows each sandbox ID as proof.",
+              },
+              {
+                name: "Fireworks AI",
+                job: "Reads messy referral text into structured facts in about a second. We raced two of their models on the same gold referrals and kept the winner — the choice ships with its scorecard.",
+              },
+              {
+                name: "ElevenLabs",
+                job: "Both phone legs: the patient intake line (talk to it live on the demo) and the payer hold-music call. Every spoken word passes the no-diagnosis filter before it reaches the voice.",
+              },
+              {
+                name: "Braintrust",
+                job: "Every live decision streams a replayable trace, and our test suite grades the system on every change: 100% of urgent cases caught, zero patients falsely reassured.",
+              },
+              {
+                name: "CopilotKit",
+                job: "The clinic-side copilot in the worklist — drafts the calendar event and the Slack note to the care team; a human still clicks send.",
+              },
+            ].map((s) => (
+              <div
+                key={s.name}
+                className="grid gap-1 border-t border-slate-100 py-6 first:border-t-0 sm:grid-cols-[12rem_1fr] sm:gap-6"
+              >
+                <p className="font-bold">{s.name}</p>
+                <p className="text-sm leading-relaxed text-slate-500">{s.job}</p>
+              </div>
+            ))}
           </div>
         </section>
 

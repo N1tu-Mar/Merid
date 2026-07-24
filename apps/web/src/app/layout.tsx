@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Providers from "@/components/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,9 +28,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
-        <Providers>{children}</Providers>
-      </body>
+      {/* CopilotKit's provider lives in (app)/layout.tsx — the clinic pages
+          are where the copilot belongs; the landing stays chrome-free. */}
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

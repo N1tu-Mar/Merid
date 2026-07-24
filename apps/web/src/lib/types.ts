@@ -109,6 +109,15 @@ export interface IvrCallResponse {
   voiced_transcript?: VoicedTurn[];
 }
 
+export interface CoverageMatch {
+  plan: string;
+  pa_required: boolean;
+  est_patient_share: string;
+  note: string;
+  next_step: string;
+  synthetic: boolean;
+}
+
 export interface OpsSummary {
   referrals_received: number;
   triaged: number;

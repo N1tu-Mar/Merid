@@ -285,6 +285,22 @@ def get_referral(referral_id: str) -> dict:
         session.close()
 
 
+@app.get("/referrals/{referral_id}/coverage")
+def get_referral_coverage(referral_id: str) -> dict:
+    """Insurance match for this referral (synthetic plan table). Runs AFTER
+    the clinical verdict and can never change urgency — it answers "does
+    this need prior auth?" and "what will the patient roughly owe?"."""
+    from app.coverage import coverage_for
+
+    session = get_session()
+    try:
+        if not session.get(ReferralRecord, referral_id):
+            raise HTTPException(404, "referral not found")
+        return coverage_for(referral_id)
+    finally:
+        session.close()
+
+
 class ApproveRequest(BaseModel):
     actor: str
     slot: str | None = None  # appointment slot label, e.g. "2026-07-24T09:00 urgent clinic"
