@@ -60,7 +60,12 @@ class ModelSpec:
 REGISTRY: dict[str, ModelSpec] = {
     "referral_vision": ModelSpec(
         task="referral_vision",
-        default=f"{_PREFIX}/kimi-k2p5",
+        # Verified against the live API: kimi-k2p6 accepts image parts AND a
+        # json_schema response_format. glm-5p2 rejects images outright
+        # ("This model does not support image inputs"), and kimi-k2p5 404s —
+        # which is why every id here is env-overridable and worth re-checking
+        # against `GET /v1/models` on the account you are demoing from.
+        default=f"{_PREFIX}/kimi-k2p6",
         modality="vision",
         env_var="FIREWORKS_VISION_MODEL",
         why=(

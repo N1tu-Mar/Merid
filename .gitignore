@@ -17,3 +17,6 @@ session*.md
 .env.example
 demo.md
 .vercel
+
+# generated demo assets / model call cache (regenerate, do not commit)
+data/extract_cache/

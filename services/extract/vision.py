@@ -28,7 +28,9 @@ can say which page a quote came from.
 
 from __future__ import annotations
 
+import io
 import logging
+import os
 
 from app.schemas import ReferralFeatures
 from services.extract.client import CallResult, FireworksError, call_json, image_part
@@ -40,7 +42,15 @@ TASK = "referral_vision"
 
 # A page image costs more tokens and more time than a transcript; one number
 # for both would be wrong for one of them.
-VISION_TIMEOUT_S = 90.0
+VISION_TIMEOUT_S = float(os.environ.get("FIREWORKS_VISION_TIMEOUT_S", "120"))
+
+# The sandbox renders at ~144 DPI so small marks survive rasterisation, but
+# sending that full-size costs vision tokens roughly with area and was
+# measured at ~47s per page against ~2s for a downscaled copy. 1600px on the
+# long edge keeps a ticked checkbox and margin handwriting legible while
+# cutting the payload by an order of magnitude — render high, transmit lean.
+VISION_MAX_EDGE_PX = int(os.environ.get("FIREWORKS_VISION_MAX_EDGE", "1600"))
+VISION_JPEG_QUALITY = int(os.environ.get("FIREWORKS_VISION_JPEG_QUALITY", "85"))
 
 # Guard against a caller handing over a 200-page upload: the request would
 # time out and fail closed, which is safe but wastes the attempt. Fail fast
@@ -88,6 +98,8 @@ def extract_from_images(
     if any(not page for page in images):
         raise ExtractionError("one or more page images are empty")
 
+    prepared = [_downscale(page) for page in images]
+
     parts: list[dict] = []
     if context:
         parts.append({"type": "text", "text": f"Document context: {context}"})
@@ -97,7 +109,10 @@ def extract_from_images(
             "text": f"{len(images)} page image(s) follow, in order starting at page 1.",
         }
     )
-    parts.extend(image_part(page, mime=mime) for page in images)
+    parts.extend(
+        image_part(page, mime=page_mime)
+        for page, page_mime in ((p, m) for p, m in prepared)
+    )
 
     result = call_json(
         task=TASK,
@@ -121,6 +136,32 @@ def extract_from_images(
         },
     )
     return features, result
+
+
+def _downscale(page: bytes, mime: str = "image/png") -> tuple[bytes, str]:
+    """Shrink a rendered page to the transmit budget.
+
+    Best-effort: if Pillow is unavailable or the bytes will not open, the
+    original is sent unchanged. A slower call is a much better failure than
+    a page we decline to read.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return page, mime
+
+    try:
+        with Image.open(io.BytesIO(page)) as img:
+            if max(img.size) <= VISION_MAX_EDGE_PX:
+                return page, mime
+            img = img.convert("RGB")
+            img.thumbnail((VISION_MAX_EDGE_PX, VISION_MAX_EDGE_PX), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=VISION_JPEG_QUALITY)
+            return buf.getvalue(), "image/jpeg"
+    except Exception:
+        log.warning("page_downscale_failed_sending_original", exc_info=True)
+        return page, mime
 
 
 __all__ = [
