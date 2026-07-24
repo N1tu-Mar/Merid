@@ -272,6 +272,7 @@ export default function Home() {
               <ul className="mt-4 space-y-2 text-sm leading-relaxed text-slate-600">
                 <li>Every verdict shows the rule that fired and the study behind it.</li>
                 <li>Insurance matched, prior auth drafted, payer chased.</li>
+                <li>A copilot explains verdicts; Slack + calendar notes draft themselves.</li>
                 <li>Nothing books or sends without a named human&apos;s signature.</li>
               </ul>
               <p className="mt-5 text-sm font-bold text-slate-700 group-hover:underline">
@@ -307,7 +308,7 @@ export default function Home() {
               },
               {
                 k: "Human signs",
-                v: "Nurse approves → slot books to the calendar. Physician approves → prior auth goes out, and the agent chases the payer by phone.",
+                v: "Nurse approves → the slot books to the calendar and the care team gets a Slack note the copilot drafted (output-filtered, like everything else). Physician approves → prior auth goes out, and the agent chases the payer by phone.",
               },
             ].map((row, i) => (
               <div
