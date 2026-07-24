@@ -21,7 +21,29 @@ import type { ReferralWorklistItem, TriageVerdict } from "@/lib/types";
  * confirms before anything is signed (invariant #4 — the agent prepares,
  * humans commit). The LLM cannot approve a verdict on its own.
  */
-export default function WorklistCopilot({
+/**
+ * Gate: the CopilotKit hooks below require a <CopilotKit> provider, which
+ * Providers.tsx only mounts when NEXT_PUBLIC_COPILOT_ENABLED === "true". When
+ * the flag is off there is no provider, and calling useCopilotReadable would
+ * throw "useCopilotKit must be used within CopilotKitProvider" — crashing the
+ * whole worklist page (and hiding the approve/booking UI with it).
+ *
+ * So the hook-using body lives in an inner component that only renders when the
+ * copilot is enabled. This keeps the page — and everything else on it, like the
+ * calendar-booking buttons in VerdictPanel — working regardless of the flag.
+ * The condition MUST match Providers.tsx exactly.
+ */
+export default function WorklistCopilot(props: {
+  item: ReferralWorklistItem;
+  onUpdated: (v: TriageVerdict) => void;
+}) {
+  if (process.env.NEXT_PUBLIC_COPILOT_ENABLED !== "true") {
+    return null;
+  }
+  return <WorklistCopilotInner {...props} />;
+}
+
+function WorklistCopilotInner({
   item,
   onUpdated,
 }: {
