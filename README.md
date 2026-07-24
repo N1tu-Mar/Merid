@@ -231,11 +231,11 @@ the browser (`Cmd/Ctrl+Shift+R`).
   *read* worklist state and *prepare* actions, but anything patient-facing
   goes through `app/output_filter.py`, urgency only ever moves through
   `app/urgency.py`, and nothing books or notifies without the named human
-  approval the API already enforces. `src/components/Providers.tsx` and
-  `src/app/api/copilotkit/route.ts` are the reinstatement seams — the
-  provider was previously unplugged because an adapter-less CopilotKit route
-  threw `CopilotApiDiscoveryError` and broke rendering; wire a real LLM
-  adapter before re-enabling the provider.
+  approval the API already enforces. The integration is mounted in
+  `src/components/Providers.tsx` and uses the Fireworks-backed adapter in
+  `src/app/api/copilotkit/route.ts`; the worklist sidebar uses a human
+  confirmation step before approving or escalating. Slack and calendar
+  notifications run only after a signed approval and fail closed.
 
 ## Deployment (Vercel)
 
