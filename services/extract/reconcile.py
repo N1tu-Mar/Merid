@@ -85,6 +85,23 @@ CONFIDENCE_BY_STATE: dict[str, float] = {
     "absent": 0.0,
 }
 
+
+def _confidence_for(state: CorroborationState, reported: list[float]) -> float:
+    """Corroboration sets a *ceiling*, never a floor.
+
+    Two readers agreeing does not make an illegible checkbox legible. If a
+    reader said it was only 0.3 sure of what it saw, agreement raises the
+    odds both read the same mark — not the odds the mark was clear. So a
+    field ends up at most as trustworthy as its shakiest reading, and at
+    most what corroboration warrants.
+
+    Without this, reconciliation would *overwrite* a low-confidence signal
+    from an extractor with 0.95 and silently disarm the escalation gate that
+    services/referral/pipeline.py and services/intake/call.py already run.
+    """
+    ceiling = CONFIDENCE_BY_STATE[state]
+    return min([ceiling, *reported]) if reported else ceiling
+
 # Above this many simultaneously disputed fields, resolving jointly costs
 # 2^n rule-engine passes. Practically unreachable (there are 12 fields, and
 # a case where 10 of them are disputed is not a triage problem, it is a
@@ -173,7 +190,9 @@ def reconcile(
             state=states[name],
             deterministic_value=det_values.get(name),
             model_value=mod_values.get(name),
-            confidence=CONFIDENCE_BY_STATE[states[name]],
+            confidence=_confidence_for(
+                states[name], _reported_confidence(name, deterministic, model)
+            ),
             source_refs=_refs_for(name, states[name], deterministic, model),
         )
         for name in CLINICAL_FIELDS
@@ -266,13 +285,29 @@ def _build_features(
         refs = _refs_for(name, state, deterministic, model)
         if refs:
             source_refs[name] = " | ".join(refs)
-        confidence[name] = CONFIDENCE_BY_STATE[state]
+        confidence[name] = _confidence_for(
+            state, _reported_confidence(name, deterministic, model)
+        )
 
     return ReferralFeatures(
         **{name: settled.get(name) for name in CLINICAL_FIELDS},
         source_refs=source_refs,
         extraction_confidence=confidence,
     )
+
+
+def _reported_confidence(
+    name: str, deterministic: ReferralFeatures, model: ReferralFeatures
+) -> list[float]:
+    """What each reader claimed for this field, where it claimed anything."""
+    return [
+        value
+        for value in (
+            deterministic.extraction_confidence.get(name),
+            model.extraction_confidence.get(name),
+        )
+        if isinstance(value, (int, float))
+    ]
 
 
 def _refs_for(

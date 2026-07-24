@@ -58,10 +58,17 @@ class ReferralRecord(Base):
     sandbox_id: Mapped[str | None] = mapped_column(String, nullable=True)
     sandbox_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sandboxed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
-    # Which OS decoded the document: "snapshot:meridian-parse:1", "image:<ref>",
+    # Which OS decoded the document: "snapshot:meridian-parse:2", "image:<ref>",
     # or "declarative-build". Null for synthetic seed data and the local
     # fallback. The auditable "what parsed this", pinnable like rule_version.
     sandbox_source: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Which models read this case, whether they agreed, and per-field
+    # corroboration state (services/extract/perception.py -> report()).
+    # Null for synthetic seed data and for failures that escalate before
+    # perception runs. Stored as JSON text rather than a column per reader
+    # because the reader set is a routing decision, not a schema decision.
+    perception_json: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class TriageVerdictRecord(Base):
@@ -122,6 +129,7 @@ def _migrate_referral_sandbox_columns() -> None:
         "sandbox_ms": "ALTER TABLE referrals ADD COLUMN sandbox_ms INTEGER",
         "sandboxed": "ALTER TABLE referrals ADD COLUMN sandboxed BOOLEAN NOT NULL DEFAULT 0",
         "sandbox_source": "ALTER TABLE referrals ADD COLUMN sandbox_source VARCHAR",
+        "perception_json": "ALTER TABLE referrals ADD COLUMN perception_json VARCHAR",
     }
     with engine.begin() as conn:
         for col, ddl in additions.items():

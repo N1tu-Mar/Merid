@@ -199,6 +199,27 @@ def _latest_verdict(session, referral_id: str) -> TriageVerdictRecord | None:
     return rows[0] if rows else None
 
 
+def _perception(ref: ReferralRecord) -> dict | None:
+    """Decode the stored perception report, tolerating older/absent rows.
+
+    A row written before this column existed, or by a path that escalated
+    before perception ran, has nothing here. Returning None rather than an
+    empty report keeps "we did not assess this" distinguishable from "we
+    assessed it and found no conflict" — collapsing those would be exactly
+    the kind of false reassurance the whole system is built against.
+    """
+    raw = getattr(ref, "perception_json", None)
+    if not raw:
+        return None
+    try:
+        import json as _json
+
+        return _json.loads(raw)
+    except (ValueError, TypeError):
+        log.warning("perception_json_unreadable", extra={"referral_id": ref.id})
+        return None
+
+
 def _worklist_item(session, ref: ReferralRecord) -> dict:
     verdict = _latest_verdict(session, ref.id)
     features = ReferralFeatures.model_validate_json(ref.features_json)
@@ -215,6 +236,11 @@ def _worklist_item(session, ref: ReferralRecord) -> dict:
             "sandboxed": bool(ref.sandboxed),
             "sandbox_source": ref.sandbox_source,
         },
+        # Which models read this case and whether they agreed. Null for
+        # seeded rows and for pipeline failures that escalate before
+        # perception runs — the UI must treat absent as "not assessed",
+        # never as "no conflicts found".
+        "perception": _perception(ref),
         "verdict": None
         if verdict is None
         else {

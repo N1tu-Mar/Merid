@@ -113,24 +113,56 @@ def test_field_neither_path_saw_is_absent_and_stays_none():
 # ---------------------------------------------------------------------------
 
 
-def test_confidence_comes_from_state_not_from_the_inputs():
-    """Inputs claim wildly different confidence; output ignores both and
-    derives it from whether the paths agreed."""
+def _with_confidence(value: bool, reported: float) -> ReferralFeatures:
+    return ReferralFeatures(
+        rectal_bleeding=value,
+        source_refs={"rectal_bleeding": f"ref@{reported}"},
+        extraction_confidence={"rectal_bleeding": reported},
+    )
+
+
+def test_confidence_is_derived_from_corroboration_when_readers_were_sure():
     result = reconcile(
-        deterministic=ReferralFeatures(
-            rectal_bleeding=False,
-            source_refs={"rectal_bleeding": "a"},
-            extraction_confidence={"rectal_bleeding": 0.9},
-        ),
-        model=ReferralFeatures(
-            rectal_bleeding=False,
-            source_refs={"rectal_bleeding": "b"},
-            extraction_confidence={"rectal_bleeding": 0.11},
-        ),
+        deterministic=_with_confidence(False, 0.98),
+        model=_with_confidence(False, 0.97),
     )
     assert result.features.extraction_confidence["rectal_bleeding"] == (
         CONFIDENCE_BY_STATE["corroborated"]
     )
+
+
+def test_corroboration_is_a_ceiling_not_a_floor():
+    """Two readers agreeing does not make an illegible checkbox legible. A
+    reader's own low confidence must survive reconciliation, or agreement
+    would silently disarm the escalation gate callers already run."""
+    result = reconcile(
+        deterministic=_with_confidence(False, 0.9),
+        model=_with_confidence(False, 0.11),
+    )
+    assert result.by_field("rectal_bleeding").state == "corroborated"
+    assert result.features.extraction_confidence["rectal_bleeding"] == 0.11
+
+
+def test_a_single_shaky_reading_stays_shaky():
+    result = reconcile(
+        deterministic=ReferralFeatures(),
+        model=_with_confidence(True, 0.2),
+    )
+    assert result.by_field("rectal_bleeding").state == "single_sourced"
+    assert result.features.extraction_confidence["rectal_bleeding"] == 0.2
+
+
+def test_confident_readers_cannot_raise_a_conflict_above_the_threshold():
+    """A disagreement between two very confident readers is *more* alarming,
+    not less — the ceiling must still apply."""
+    result = reconcile(
+        deterministic=_with_confidence(False, 0.99),
+        model=_with_confidence(True, 0.99),
+    )
+    assert result.features.extraction_confidence["rectal_bleeding"] == (
+        CONFIDENCE_BY_STATE["conflict"]
+    )
+    assert result.features.extraction_confidence["rectal_bleeding"] < 0.5
 
 
 def test_conflict_confidence_is_below_the_escalation_threshold():

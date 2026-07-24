@@ -14,6 +14,7 @@ rule evaluation itself.
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -22,7 +23,8 @@ from app.db import ReferralRecord, TriageVerdictRecord, get_session
 from app.rule_engine import evaluate, load_rules
 from app.schemas import ReferralFeatures, TriageVerdict
 from app.tracing import log_span, traced
-from services.referral.extract import ExtractionError, extract_features
+from services.extract.perception import PerceptionError, perceive_document
+from services.referral.extract import ExtractionError
 from services.referral.sandbox import SandboxError, parse_document_in_sandbox
 
 log = logging.getLogger("meridian.referral.pipeline")
@@ -82,18 +84,32 @@ def process_referral(
         "sandbox_source": parse.sandbox_source,
     }
 
-    if not raw_text.strip():
+    # A scanned fax can be a pure page image with no extractable text at all.
+    # That used to be unparseable; the vision reader can read it, so only a
+    # document with neither text nor pages is genuinely nothing to work with.
+    if not raw_text.strip() and not parse.page_images:
         return _persist(referral_id, source, raw_text, patient_name, ReferralFeatures(), _escalate_verdict(referral_id, "document_unparseable_empty_text"), **sb)
 
     try:
-        features = extract_features(raw_text)
-    except ExtractionError as e:
+        perception = perceive_document(raw_text, parse.page_images)
+    except (PerceptionError, ExtractionError) as e:
         return _persist(referral_id, source, raw_text, patient_name, ReferralFeatures(), _escalate_verdict(referral_id, f"extraction_error: {e}"), **sb)
     except Exception as e:
         log.exception("unexpected_extraction_failure")
         return _persist(referral_id, source, raw_text, patient_name, ReferralFeatures(), _escalate_verdict(referral_id, f"unexpected_extraction_failure: {e}"), **sb)
 
-    if any(v < LOW_CONFIDENCE_THRESHOLD for v in features.extraction_confidence.values()):
+    features = perception.features
+    sb["perception"] = perception.report()
+
+    # A conflicted field is deliberately scored below the threshold, but it
+    # is handled after rule evaluation so the verdict keeps its urgency and
+    # rules_fired. Excluded here so this gate — which produces a bare
+    # ESCALATE with neither — cannot pre-empt the better answer.
+    if any(
+        value < LOW_CONFIDENCE_THRESHOLD
+        for name, value in features.extraction_confidence.items()
+        if name not in perception.conflicts
+    ):
         return _persist(referral_id, source, raw_text, patient_name, features, _escalate_verdict(referral_id, "low_extraction_confidence"), **sb)
 
     try:
@@ -102,9 +118,27 @@ def process_referral(
         log.exception("unexpected_rule_engine_failure")
         return _persist(referral_id, source, raw_text, patient_name, features, _escalate_verdict(referral_id, f"unexpected_rule_engine_failure: {e}"), **sb)
 
+    if perception.has_conflict:
+        # Keep the computed urgency — it was resolved toward the more urgent
+        # reading, so it is correct — but never book on a disputed fact. The
+        # nurse gets the right priority AND is told what the readers disagreed
+        # about, which a bare ESCALATE would have thrown away.
+        log.warning(
+            "perception_conflict_forcing_escalate",
+            extra={"referral_id": referral_id, "conflicts": perception.conflicts},
+        )
+        verdict = verdict.model_copy(update={"disposition": "ESCALATE"})
+
     log_span(
         output={"urgency": verdict.urgency, "disposition": verdict.disposition},
-        metadata={"rules_fired": verdict.rules_fired, "rule_version": verdict.rule_version, **sb},
+        metadata={
+            "rules_fired": verdict.rules_fired,
+            "rule_version": verdict.rule_version,
+            "readers_ok": perception.readers_ok,
+            "corroborated": perception.corroborated,
+            "conflicts": perception.conflicts,
+            **{k: v for k, v in sb.items() if k != "perception"},
+        },
     )
     return _persist(referral_id, source, raw_text, patient_name, features, verdict, **sb)
 
@@ -123,6 +157,7 @@ def _persist(
     sandbox_ms: int | None = None,
     sandboxed: bool = False,
     sandbox_source: str | None = None,
+    perception: dict | None = None,
 ) -> tuple[ReferralRecord, TriageVerdict]:
     session = get_session()
     try:
@@ -136,6 +171,9 @@ def _persist(
             sandbox_ms=sandbox_ms,
             sandboxed=sandboxed,
             sandbox_source=sandbox_source,
+            # Which models read this case and whether they agreed. Null on
+            # the failure paths that escalate before perception runs.
+            perception_json=json.dumps(perception) if perception else None,
         )
         session.add(record)
         session.add(
