@@ -109,6 +109,19 @@ export interface IvrCallResponse {
   voiced_transcript?: VoicedTurn[];
 }
 
+export interface OpsSummary {
+  referrals_received: number;
+  triaged: number;
+  urgent_flagged: number;
+  avg_triage_seconds: number | null;
+  approved_bookings: number;
+  landmines_caught: number;
+  landmines: { referral_id: string; patient_name: string }[];
+  payer_calls_made: number;
+  staff_minutes_saved: number;
+  days_saved: number;
+}
+
 export interface EvalsSummary {
   generated_at: string;
   triage: {

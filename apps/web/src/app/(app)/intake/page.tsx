@@ -10,6 +10,7 @@
 // referral says "probable hemorrhoids". Every answer is editable so judges
 // can change one answer live and watch the verdict change deterministically.
 
+import Script from "next/script";
 import { useState } from "react";
 import { post } from "@/lib/api";
 import type { IntakeCallResponse } from "@/lib/types";
@@ -173,6 +174,30 @@ export default function IntakePage() {
               Place the call to hear the intake line run the script and book a slot.
             </div>
           )}
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Or talk to it live (beta)
+            </h2>
+            <p className="mb-3 text-xs text-slate-400">
+              A live ElevenLabs voice agent running the same fixed-order script — needs a
+              microphone. It will not discuss diagnoses. The scripted call above remains the
+              deterministic reference path; live answers still go through the same rule engine
+              before anything books.
+            </p>
+            <div
+              // Custom element from the ElevenLabs widget script; rendered via
+              // innerHTML so TSX doesn't need a JSX intrinsic declaration.
+              dangerouslySetInnerHTML={{
+                __html:
+                  '<elevenlabs-convai agent-id="agent_1301kyarfhwje23rcqwqnzvkw7p1"></elevenlabs-convai>',
+              }}
+            />
+            <Script
+              src="https://unpkg.com/@elevenlabs/convai-widget-embed"
+              strategy="lazyOnload"
+            />
+          </div>
         </div>
       </div>
     </div>

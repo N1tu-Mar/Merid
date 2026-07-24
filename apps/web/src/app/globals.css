@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* The demo is light-mode everywhere, deliberately: judges' OS themes must
+   not flip the app dark while the landing stays light. The dark: variant is
+   remapped to a .dark class we never set, which disables all dark: styles
+   regardless of system preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -8,15 +14,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: Arial, Helvetica, sans-serif;
 }
 
 body {
