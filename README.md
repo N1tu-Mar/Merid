@@ -234,8 +234,14 @@ the browser (`Cmd/Ctrl+Shift+R`).
   approval the API already enforces. The integration is mounted in
   `src/components/Providers.tsx` and uses the Fireworks-backed adapter in
   `src/app/api/copilotkit/route.ts`; the worklist sidebar uses a human
-  confirmation step before approving or escalating. Slack and calendar
-  notifications run only after a signed approval and fail closed.
+  confirmation step before approving or escalating. Slack notification and
+  calendar booking run only after a signed approval and fail closed.
+  **Slack** (`services/notify/slack.py`) posts an urgency-gated message via an
+  incoming webhook. **Calendar** (`services/calendar/`) is a standalone,
+  Slack-independent `.ics` generator for any appointment type — the approve
+  response returns a `booking.ics` download link; opening it in any calendar
+  app creates the event (a human commits, per invariant #4). No GCP project
+  required; the Google Calendar API is a drop-in upgrade for a real event ID.
 
 ## Deployment (Vercel)
 

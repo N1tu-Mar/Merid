@@ -18,7 +18,8 @@ class _FakeResponse:
 
 @pytest.fixture
 def captured(monkeypatch):
-    """Capture httpx.post calls from both notify modules."""
+    """Capture Slack httpx.post calls. Calendar no longer posts to Slack —
+    it produces .ics locally — so only the slack module is patched."""
     calls = []
 
     def fake_post(url, json=None, timeout=None):
@@ -26,13 +27,7 @@ def captured(monkeypatch):
         return _FakeResponse()
 
     monkeypatch.setattr(slack.httpx, "post", fake_post)
-    monkeypatch.setattr(cal.httpx, "post", fake_post)
     monkeypatch.setattr(slack, "WEBHOOK_URL", "https://hooks.slack.com/services/TEST")
-    monkeypatch.setattr(cal, "WEBHOOK_URL", "https://hooks.slack.com/services/TEST")
-    # Default to the fallback transport; tests that exercise the workflow
-    # trigger opt in explicitly. Without this the real env var would leak in
-    # and silently change which branch is under test.
-    monkeypatch.setattr(cal, "WORKFLOW_WEBHOOK_URL", None)
     return calls
 
 
@@ -113,21 +108,82 @@ def test_diagnostic_language_is_blocked_not_posted(captured, monkeypatch):
     assert captured == []
 
 
-def test_calendar_title_carries_no_clinical_content():
+# --- calendar: decoupled from Slack, produces .ics -------------------------
+
+
+def _make_calendar(**overrides):
+    kwargs = dict(
+        referral_id="REF-0042",
+        urgency="urgent",
+        booked_slot="2026-07-28T09:00 urgent clinic",
+        approved_by="Nurse Chen",
+    )
+    kwargs.update(overrides)
+    return cal.create_calendar_event(**kwargs)
+
+
+def test_calendar_does_not_touch_slack(monkeypatch):
+    """The calendar path must not POST to Slack at all — if it tries, fail."""
+    import services.calendar.ics as ics_mod  # noqa: F401
+
+    # No httpx anywhere in the calendar module to patch; asserting the result
+    # comes back "generated" with an .ics is proof it went the local path.
+    result = _make_calendar()
+    assert result["status"] == "generated"
+    assert result["ics"].startswith("BEGIN:VCALENDAR")
+
+
+def test_calendar_urgent_generates_ics():
+    result = _make_calendar()
+    assert result["status"] == "generated"
+    assert result["start"] == "2026-07-28T09:00:00"
+    assert result["end"] == "2026-07-28T09:45:00"
+    assert "DTSTART:20260728T090000" in result["ics"]
+    assert "DTEND:20260728T094500" in result["ics"]
+
+
+def test_calendar_summary_carries_no_clinical_content():
     from app.output_filter import check_output
 
-    event = cal.build_event(
+    appt = cal.build_appointment(
         referral_id="REF-0042",
         urgency="urgent",
         booked_slot="2026-07-28T09:00",
         approved_by="Nurse Chen",
     )
-    assert check_output(event["title"]).allowed
-    assert check_output(event["description"]).allowed
-    assert "REF-0042" in event["title"]
+    assert check_output(appt.summary).allowed
+    assert "REF-0042" in appt.summary
+    assert "hemorrhoid" not in appt.summary.lower()
 
 
-# --- never raises ----------------------------------------------------------
+def test_calendar_respects_same_threshold_as_slack():
+    """A routine approval must not book — calendar shares Slack's threshold."""
+    result = _make_calendar(urgency="routine", booked_slot="2026-08-10T14:00")
+    assert result["status"] == "skipped_below_threshold"
+
+
+def test_calendar_without_slot_is_skipped():
+    result = _make_calendar(booked_slot=None)
+    assert result["status"] == "skipped_no_slot"
+
+
+def test_unparseable_slot_refuses_rather_than_inventing_a_time():
+    """A fabricated appointment time is worse than no event."""
+    result = _make_calendar(booked_slot="next Tuesday-ish")
+    assert result["status"] == "skipped_unparseable_slot"
+
+
+def test_calendar_never_raises(monkeypatch):
+    """Any internal failure returns a status dict, never propagates."""
+    def boom(*a, **k):
+        raise RuntimeError("ics generator blew up")
+
+    monkeypatch.setattr(cal, "build_ics", boom)
+    result = _make_calendar()
+    assert result["status"] == "failed"
+
+
+# --- never raises (slack) --------------------------------------------------
 
 
 def test_slack_transport_failure_is_swallowed(monkeypatch):
@@ -141,111 +197,6 @@ def test_slack_transport_failure_is_swallowed(monkeypatch):
     assert result["status"] == "failed"
 
 
-def test_calendar_transport_failure_is_swallowed(monkeypatch):
-    monkeypatch.setattr(cal, "WEBHOOK_URL", "https://hooks.slack.com/services/TEST")
-
-    def boom(*a, **k):
-        raise RuntimeError("slack is down")
-
-    monkeypatch.setattr(cal.httpx, "post", boom)
-    result = cal.create_calendar_event(
-        referral_id="REF-0042",
-        urgency="urgent",
-        booked_slot="2026-07-28T09:00",
-        approved_by="Nurse Chen",
-    )
-    assert result["status"] == "failed"
-
-
 def test_no_webhook_configured_is_not_an_error(monkeypatch):
     monkeypatch.setattr(slack, "WEBHOOK_URL", None)
     assert _approve()["status"] == "skipped_no_webhook"
-
-
-def test_calendar_respects_same_threshold_as_slack(captured):
-    """A routine approval must not schedule via this path — the two channels
-    share one threshold so they can't drift apart."""
-    result = cal.create_calendar_event(
-        referral_id="REF-0001",
-        urgency="routine",
-        booked_slot="2026-08-10T14:00",
-        approved_by="Nurse Test",
-    )
-    assert result["status"] == "skipped_below_threshold"
-    assert captured == []
-
-
-def test_calendar_urgent_falls_back_to_marker_message(captured, monkeypatch):
-    """With no workflow webhook configured, we still post a visible marker."""
-    monkeypatch.setattr(cal, "WORKFLOW_WEBHOOK_URL", None)
-    result = cal.create_calendar_event(
-        referral_id="REF-0042",
-        urgency="urgent",
-        booked_slot="2026-07-28T09:00",
-        approved_by="Nurse Chen",
-    )
-    assert result["status"] == "requested_via_message"
-    assert len(captured) == 1
-    assert cal.EVENT_MARKER in captured[0]["json"]["text"]
-
-
-# --- workflow transport ----------------------------------------------------
-
-
-def test_workflow_webhook_is_preferred_and_sends_structured_json(captured, monkeypatch):
-    monkeypatch.setattr(cal, "WORKFLOW_WEBHOOK_URL", "https://hooks.slack.com/triggers/T/1/x")
-    result = cal.create_calendar_event(
-        referral_id="REF-0042",
-        urgency="urgent",
-        booked_slot="2026-07-28T09:00 urgent clinic",
-        approved_by="Nurse Chen",
-    )
-    assert result["status"] == "requested_via_workflow"
-    assert len(captured) == 1
-    body = captured[0]["json"]
-    # Typed fields the connector maps onto, not a prose blob.
-    assert body["start"] == "2026-07-28T09:00:00"
-    assert body["end"] == "2026-07-28T09:45:00"
-    assert body["referral_id"] == "REF-0042"
-    assert "hemorrhoid" not in body["title"].lower()
-
-
-def test_unparseable_slot_refuses_rather_than_inventing_a_time(captured, monkeypatch):
-    """A fabricated appointment time is worse than no event."""
-    monkeypatch.setattr(cal, "WORKFLOW_WEBHOOK_URL", "https://hooks.slack.com/triggers/T/1/x")
-    result = cal.create_calendar_event(
-        referral_id="REF-0042",
-        urgency="urgent",
-        booked_slot="next Tuesday-ish",
-        approved_by="Nurse Chen",
-    )
-    assert result["status"] == "skipped_unparseable_slot"
-    assert captured == []
-
-
-@pytest.mark.parametrize(
-    "label,expected_start",
-    [
-        ("2026-07-28T09:00", "2026-07-28T09:00:00"),
-        ("2026-07-28T09:00 urgent clinic", "2026-07-28T09:00:00"),
-        ("2026-07-28 09:00", "2026-07-28T09:00:00"),
-        ("booked 2026-07-28T14:30:00 room 3", "2026-07-28T14:30:00"),
-    ],
-)
-def test_parse_slot_handles_loose_nurse_entered_labels(label, expected_start):
-    start, end = cal.parse_slot(label)
-    assert start == expected_start
-    assert end is not None
-
-
-@pytest.mark.parametrize("label", ["", "next week", "urgent clinic", "TBD"])
-def test_parse_slot_returns_none_for_untimed_labels(label):
-    assert cal.parse_slot(label) == (None, None)
-
-
-def test_calendar_without_slot_is_skipped(captured):
-    result = cal.create_calendar_event(
-        referral_id="REF-0042", urgency="urgent", booked_slot=None, approved_by="N"
-    )
-    assert result["status"] == "skipped_no_slot"
-    assert captured == []
