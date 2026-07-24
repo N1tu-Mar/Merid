@@ -57,6 +57,34 @@ export default function WorklistPage() {
         </div>
       )}
 
+      {items !== null &&
+        (() => {
+          const booked = items.filter((i) => i.verdict?.approved_by && i.verdict?.booked_slot);
+          if (booked.length === 0) return null;
+          return (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/40">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                📅 On the calendar — {booked.length} confirmed booking{booked.length > 1 ? "s" : ""}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {booked.slice(0, 4).map((i) => (
+                  <Link
+                    key={i.referral_id}
+                    href={`/worklist/${i.referral_id}`}
+                    className="rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300"
+                  >
+                    <span className="font-semibold">{i.patient_name}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400"> · {i.verdict?.booked_slot}</span>
+                  </Link>
+                ))}
+                {booked.length > 4 && (
+                  <span className="px-2 py-1 text-xs text-emerald-700">+{booked.length - 4} more</span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
       {items !== null && items.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
           <table className="w-full min-w-[720px] text-left text-sm">

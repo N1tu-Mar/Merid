@@ -65,6 +65,25 @@ const CLINICS: { name: string; miles: number; nextDay: string }[] = [
   { name: "University Medical Center GI", miles: 7.5, nextDay: "+2 days" },
 ];
 
+// "Hold the date" for the patient the moment the call books: a prefilled
+// Google Calendar event (no OAuth). Demo booking is synthetic, so the event
+// is stamped next-day 9:00 with the human-readable slot in the details; the
+// signed .ics from the clinic follows nurse approval.
+function patientCalendarUrl(slotLabel: string, planName: string): string {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  start.setHours(9, 0, 0, 0);
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: "GI appointment hold — Meridian (DEMO)",
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `Slot: ${slotLabel}\nInsurance: ${planName}\nA nurse confirms every booking — official invite to follow.\nDEMO — synthetic data. Not for clinical use.`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 const DEMO_ANSWERS: Record<string, string> = {
   age: "I'm 42",
   rectal_bleeding: "yes",
@@ -189,9 +208,23 @@ export default function IntakePage() {
                   {plan.pa ? "prior auth required — Meridian handles it" : "no prior auth needed"}
                 </p>
                 {result.booked_slot ? (
-                  <p className="mt-3 rounded-md bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    Booked: {result.booked_slot}
-                  </p>
+                  <div className="mt-3 rounded-md bg-emerald-50 px-4 py-3 dark:bg-emerald-950">
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                      Booked: {result.booked_slot}
+                    </p>
+                    <a
+                      href={patientCalendarUrl(result.booked_slot, plan.name)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                    >
+                      📅 Hold the date — add to Google Calendar
+                    </a>
+                    <p className="mt-1.5 text-[11px] text-emerald-700/80 dark:text-emerald-400">
+                      The official invite (.ics) follows once a nurse confirms — every
+                      booking is human-signed.
+                    </p>
+                  </div>
                 ) : (
                   <p className="mt-3 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                     Routed to a nurse callback — no booking without a clear, complete picture.
