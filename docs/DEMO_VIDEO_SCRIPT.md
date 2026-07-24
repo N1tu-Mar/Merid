@@ -1,93 +1,134 @@
-# 2-minute demo video script
+# 2-minute demo video script (v3)
 
-Conversational, and it follows the frontend exactly — sponsors come up
-where their tech actually fires in the flow, not as a separate section.
-Record at merid-hacksprint.vercel.app or localhost. Reseed first, dismiss
-the CopilotKit popup once, pre-open `/` and `/intake`. Timestamps are
-targets; if a click lags, keep talking. Total ≈ 2:00.
+Conversational, follows the frontend, and **every sponsor is named at the
+exact moment their tech fires in the flow** — no separate sponsor section.
+
+## The flow at a glance (this is the spine of the video)
+
+| # | Flow step | Sponsor | What the viewer sees |
+|---|---|---|---|
+| 1 | Patient calls the intake line | **ElevenLabs** | Voice agent answers, asks 11 evidence-based questions + insurance |
+| 2 | The transcript gets read | **Fireworks AI** | Deterministic parser labels; Fireworks corroborates with per-field confidence, stateless calls |
+| 3 | (Fax path) documents get opened | **Daytona** | 🔒 badge — internet-blocked sandbox, self-destructs, ID shown as proof |
+| 4 | Rules decide, evidence cited | — (our core) | Rule fired + the 2,093-patient study, linked in the UI |
+| 5 | Nurse signs → care team looped in | **CopilotKit** | Signature hash, calendar event + filtered Slack draft to #gi-triage |
+| 6 | Prior auth → agent phones the payer | **ElevenLabs** | Real phone tree, DTMF tones, hold music; status comes back |
+| 7 | Everything measured | **Braintrust** | Practice pulse + traces; 100% urgent caught, 0 falsely reassured; model A/B receipt |
+
+Patient demo covers steps 1–2 (+ booking payoff). Doctor demo covers 3–7.
 
 ---
 
-**0:00–0:15 — Landing page** *(hero on screen; scroll slowly as you talk)*
+## ACT 0 — Hook (0:00–0:15) · landing page, scroll slowly
 
 > Raise your hand if you hate being on hold. Yeah — everyone. Now imagine
 > you're doubled over gripping your stomach, and the best healthcare can
-> offer you is elevator music. Here's the part that isn't funny: in
-> cancer care, every four weeks of delay raises your risk of dying by up
-> to thirteen percent. Three in four colorectal cancers in people under
-> fifty get caught late. The average wait just to *see* a GI doctor is
-> forty days. So we built Meridian — the end of "please hold."
+> offer you is elevator music. Here's the part that isn't funny: in cancer
+> care, every four weeks of delay raises your risk of dying by up to
+> thirteen percent. Three in four colorectal cancers in people under fifty
+> get caught late. The average wait just to *see* a GI doctor is forty
+> days. So we built Meridian — the end of "please hold."
 
-**0:15–0:55 — Patient side** *(go to `/intake`; point at the insurance
-dropdown, then click **Place call** and let the first two audio turns play
-underneath you)*
+## ACT 1 — The PATIENT demo (0:15–0:55) · go to `/intake`
 
-> This is what a patient gets. Maya Chen, 42, three weeks of bleeding —
-> her doctor already wrote her off as "probable hemorrhoids." She calls,
-> and an ElevenLabs voice agent picks up — no hold music, and it asks
-> eleven clinically-grounded questions plus her insurance. Two things are
-> happening under the hood: a deterministic parser is doing the labeling —
-> auditable, no AI vibes — and Fireworks runs a corroborating pass, small
-> fast open models giving us a confidence score on every single field.
-> The calls are stateless, so no patient text ever sits in some model
-> provider's logs. If the parser and the model disagree, or confidence
-> drops? It goes to a human. It never guesses.
+*Point at the insurance dropdown, click **Place call**, let two audio
+turns play under your voice.*
+
+> Here's the patient's side. Maya Chen, forty-two, three weeks of
+> bleeding — her doctor already wrote her off as "probable hemorrhoids."
+> She calls, and an **ElevenLabs** voice agent picks up — no hold music —
+> and walks her through eleven clinically-grounded questions, plus her
+> insurance. **[ELEVENLABS — step 1 of the flow]**
 >
-> *(outcome card appears — point as you go)*
->
-> And look what she gets before she hangs up: flagged urgent, booked
-> tomorrow, three clinics sorted by distance with what it'll roughly cost
-> her on her plan, and a hold-the-date for her calendar. Notice what the
-> voice never said — a diagnosis. It physically can't. Our no-diagnosis
-> filter runs *inside* the speech synthesizer.
+> Under the hood, two readers check each other: our deterministic parser
+> does the labeling — auditable, no AI vibes — and **Fireworks** runs the
+> corroborating pass: small, fast, open models scoring confidence on
+> every single field, called statelessly so no patient text ever sits in
+> a model provider's logs. If they disagree, or confidence drops, it goes
+> to a human. It never guesses. **[FIREWORKS — step 2]**
 
-**0:55–1:35 — Doctor side** *(click "switch to doctor side"; hover the 🔒
-badge on the worklist, open Maya's case, scroll the fired rule, then
-Approve → type a name → Confirm)*
+*The outcome card appears — point at each element.*
 
-> Same case, the clinic's view. See this lock badge? Faxes are
-> attacker-controlled input, so every document gets opened inside a
-> Daytona sandbox — internet blocked, and it self-destructs seconds
-> later. Sensitive files never touch our servers, and the sandbox ID is
-> right here as proof.
->
-> Now the decision. No model decided this — a written rule fired: under
+> Before she hangs up: flagged urgent, booked tomorrow, three clinics
+> sorted by distance with what it'll roughly cost on her plan, and a
+> hold-the-date for her calendar. And notice what the voice never said —
+> a diagnosis. It physically can't; our no-diagnosis filter runs *inside*
+> the speech synthesizer.
+
+## ACT 2 — The DOCTOR demo (0:55–2:00) · click "switch to doctor side"
+
+*The handoff line as the worklist loads:*
+
+> That call Maya just made? It's already here, on the clinic's side —
+> in the triage queue with an urgency, a disposition, and her insurance
+> already matched.
+
+*Hover the 🔒 badge on a fax-scan row.*
+
+> Faxes come in this door too — and a fax is attacker-controlled input.
+> So every document gets opened inside a **Daytona** sandbox: internet
+> blocked, self-destructs seconds later, and the sandbox ID is badged
+> right here as proof. Sensitive files never touch our servers.
+> **[DAYTONA — step 3]**
+
+*Open Maya's case; scroll to the fired rule.*
+
+> Now the decision — and no model made it. A written rule fired: under
 > fifty, bleeding, plus a second red flag. That threshold was measured on
-> two thousand and ninety-three real patients, and the citation is right
-> there in the interface. Insurance got matched too — but only *after*
-> the clinical verdict. Money can never change urgency in this system.
->
-> *(click Confirm approval)*
->
-> A nurse signs — that's a cryptographic hash, that's an audit trail —
-> and the moment she does, the slot hits the calendar and CopilotKit's
-> care-team loop drafts the Slack note, which passes the same
-> no-diagnosis filter. Agents prepare. Humans commit.
+> two thousand ninety-three real patients, and the citation is linked
+> right in the interface. Insurance matched too — but only *after* the
+> clinical verdict. Money can never change urgency here.
 
-**1:35–1:50 — Prior auth & payer** *(flow strip → step 2; open the packet,
-Approve → Submit → Call payer IVR; let one line of hold music play)*
+*Click Approve → type "Dana Brooks, RN" → Confirm. Point at the hash,
+then the care-team card.*
+
+> A nurse signs — that's a cryptographic hash, that's an audit trail —
+> and the instant she does, **CopilotKit**'s care-team loop kicks in: the
+> slot hits the calendar and a Slack draft for #gi-triage appears, having
+> passed the same no-diagnosis filter. Agents prepare; humans commit.
+> **[COPILOTKIT — step 5]**
+
+*Flow strip → step 2 "Prior auth & payer". Open the packet, Approve →
+Submit → Call payer IVR. Let one line of hold music play.*
 
 > Prior auth writes itself — every sentence linked to its source — the
 > physician signs, and then our agent does the job everyone hates: it
 > calls the insurance company. Real phone tree, real touch-tones, real
-> hold music — ElevenLabs on both ends. Approved. No human sat on hold.
+> hold music — **ElevenLabs** on both ends of this product's phone calls.
+> Approved. No human sat on hold. **[ELEVENLABS again — step 6]**
 
-**1:50–2:00 — Practice pulse** *(flow strip → step 3; end on the tiles)*
+*Flow strip → step 3 "Practice pulse". End on the tiles.*
 
-> And it's all measured. Every decision streams a trace to Braintrust,
-> which grades us on every change: one hundred percent of urgent cases
-> caught, zero patients falsely reassured — even our extraction model was
-> picked by a head-to-head eval, not a vibe. We don't diagnose anyone.
-> We make sure the right people get scoped. Meridian.
+> And it's all measured. Every live decision streams a trace into
+> **Braintrust**, which grades the system on every change: one hundred
+> percent of urgent cases caught, zero patients falsely reassured — we
+> even picked our extraction model with a head-to-head Braintrust eval,
+> not a vibe. **[BRAINTRUST — step 7]**
+>
+> We don't diagnose anyone. We make sure the right people get scoped.
+> Meridian.
 
 ---
 
-**Recording prep**
+## Recording prep
+
 - Clean state: `rm meridian.db && .venv/bin/python -m app.seed`, restart
   the backend — fictional names, one PA packet pre-drafted at step 2.
 - Intake + IVR audio play from the committed cache — wifi can't hurt you.
 - Dismiss the CopilotKit popup once in the recording browser.
-- Do one silent click-through before rolling; the approve form needs a
-  typed name ("Dana Brooks, RN" reads well on camera).
+- One silent click-through before rolling.
+- Running hot? Cut "called statelessly…" (it comes back at the Daytona
+  beat). Never cut the last two sentences.
 - If something breaks on camera: "This is live — and when anything fails
-  in Meridian, it fails to a human. Including demos." Then keep going.
+  in Meridian, it fails to a human. Including demos." Keep going.
+
+## Honesty guardrails (if asked after)
+
+- WorkOS and CodeRabbit are not integrated — don't claim them. If asked:
+  WorkOS hosted us; CodeRabbit reviewed PRs is only claimable if it's
+  actually installed on the repo.
+- The CopilotKit LLM sidebar is feature-flagged off (it leaked a
+  differential under red-teaming; fail-closed applies to us too). The
+  Slack/calendar loop shown IS the CopilotKit lane's deterministic half.
+- Documents are read as text after sandbox decode — don't claim live
+  image-model inference; it's the designed next step.
