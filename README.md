@@ -1,15 +1,29 @@
-# Meridian
+# Meridian — the end of "please hold"
+
+**Live demo: <https://merid-hacksprint.vercel.app>**
 
 An agent that moves a patient from "something's wrong" to a booked colonoscopy with
 prior authorization approved. It never diagnoses — it decides exactly one thing: **does
 this person need a GI appointment, and how fast.** See `CLAUDE.md` for the full spec and
 the non-negotiable invariants this codebase enforces in code, not prompts.
 
+One system, two doors:
+
+- **Patient side** (`/intake`) — call the line (live ElevenLabs voice agent, or the
+  scripted reference call), answer the evidence-based questions incl. insurance, and
+  before you hang up: an urgent slot booked, nearby options by distance with your
+  estimated cost, and a hold-the-date calendar link.
+- **Doctor side** (`/worklist` → prior auth → practice pulse) — a queue that argues
+  its case: every verdict shows the rule that fired and the study behind it, insurance
+  matched (never affecting urgency), signatures with hashes, Slack/calendar drafts on
+  approval, and the payer IVR call with real hold music.
+
 > **This repo (`N1tu-Mar/Merid`) is the canonical home.** It carries the full
 > history migrated from `N1tu-Mar/daytona` — rule engine + sandboxed referral
 > pipeline + worklist (foundation), plus the voice layer, Braintrust
 > evals/tracing, evidence-grounded rules, verified fact sheet
-> ([docs/FACTS.md](docs/FACTS.md)), and the landing page.
+> ([docs/FACTS.md](docs/FACTS.md)), the pitch landing page, insurance matching,
+> and the two-sided patient/doctor interface.
 
 > **DEMO — synthetic data. Not for clinical use.**
 
@@ -225,17 +239,16 @@ the browser (`Cmd/Ctrl+Shift+R`).
   the non-call, non-ElevenLabs flows. Extraction model choice is
   eval-driven — before changing `FIREWORKS_MODEL`, run
   `python -m evals.extraction_ab` and let the Braintrust diff decide.
-- **CopilotKit — doctor's-office integrations**: teammates are wiring the
-  clinic-facing copilot (calendar booking, Slack notifications to the care
-  team). Ground rules so it composes with the invariants: the copilot may
-  *read* worklist state and *prepare* actions, but anything patient-facing
-  goes through `app/output_filter.py`, urgency only ever moves through
-  `app/urgency.py`, and nothing books or notifies without the named human
-  approval the API already enforces. The integration is mounted in
-  `src/components/Providers.tsx` and uses the Fireworks-backed adapter in
-  `src/app/api/copilotkit/route.ts`; the worklist sidebar uses a human
-  confirmation step before approving or escalating. Slack notification and
-  calendar booking run only after a signed approval and fail closed.
+- **CopilotKit — doctor's-office integrations**: the nurse copilot
+  (worklist sidebar), Slack notifications, and calendar/.ics are built.
+  **Status: the LLM sidebar is feature-flagged OFF for the demo**
+  (`NEXT_PUBLIC_COPILOT_ENABLED`) — red-teaming it with diagnostic bait
+  produced condition differentials despite three layers of guards (fix
+  trail documented in `apps/web/src/app/api/copilotkit/route.ts`); per this
+  project's own rules, an unverifiable guardrail doesn't ship. The
+  deterministic pieces stay live and fail closed: Slack drafts and calendar
+  events run only after a signed approval, and anything patient-facing
+  goes through `app/output_filter.py`.
   **Slack** (`services/notify/slack.py`) posts an urgency-gated message via an
   incoming webhook. **Calendar** (`services/calendar/`) is a standalone,
   Slack-independent `.ics` generator for any appointment type — the approve
