@@ -104,18 +104,38 @@ class PerceptionResult:
         }
 
 
+# What each upload kind is, in words the vision model can use. Framing
+# only — a fact still has to be quotable from the page regardless of what
+# the file claims to be.
+DOCUMENT_CONTEXT = {
+    "fax_scan": "a faxed gastroenterology referral from a primary care practice",
+    "patient_upload": "a document uploaded by the patient — medical history, "
+    "a discharge summary, a lab report, or a photograph of paperwork",
+    "insurance_card": "a photograph or scan of an insurance card",
+    "voice_call": "a document attached to a phone intake",
+}
+
+
 def perceive_document(
     raw_text: str,
     page_images: list[bytes] | None = None,
+    source: str = "fax_scan",
 ) -> PerceptionResult:
-    """Read a document with the text model and the vision model.
+    """Read any uploaded file with the text model and the vision model.
 
     `page_images` comes from the Daytona sandbox (SandboxParseResult). When
     it is empty — plain-text document, render failure, no Daytona key — the
     text reader runs alone and every field is single-sourced.
+
+    `source` is the upload kind. It only frames what the reader is looking
+    at (a referral fax and a patient's own discharge summary are laid out
+    nothing alike); it never becomes evidence, and an unrecognised source
+    just means no framing rather than an error.
     """
     text_features, text_outcome = _run_text_reader(raw_text)
-    vision_features, vision_outcome = _run_vision_reader(page_images or [])
+    vision_features, vision_outcome = _run_vision_reader(
+        page_images or [], context=DOCUMENT_CONTEXT.get(source)
+    )
 
     return _assemble(
         # Ordering matters only for how conflicts are labelled in the report:
@@ -183,7 +203,9 @@ def _run_text_reader(raw_text: str) -> tuple[ReferralFeatures, ReaderOutcome]:
     )
 
 
-def _run_vision_reader(page_images: list[bytes]) -> tuple[ReferralFeatures, ReaderOutcome]:
+def _run_vision_reader(
+    page_images: list[bytes], context: str | None = None
+) -> tuple[ReferralFeatures, ReaderOutcome]:
     from services.extract.vision import TASK, extract_from_images
 
     if not page_images:
@@ -191,7 +213,7 @@ def _run_vision_reader(page_images: list[bytes]) -> tuple[ReferralFeatures, Read
             name="referral_vision", ok=False, error="no page images"
         )
     try:
-        features, call = extract_from_images(page_images)
+        features, call = extract_from_images(page_images, context=context)
     except Exception as e:
         log.warning("vision_reader_failed", extra={"error": str(e)})
         return ReferralFeatures(), ReaderOutcome(

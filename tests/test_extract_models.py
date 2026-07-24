@@ -79,8 +79,18 @@ def test_every_task_has_a_distinct_model_and_a_rationale():
 
 def test_registry_spans_more_than_one_model_class():
     """The argument is multi-model, not one model called several times."""
-    assert len({s.modality for s in models.REGISTRY.values()}) >= 4
-    assert len({s.default for s in models.REGISTRY.values()}) >= 4
+    assert {s.modality for s in models.REGISTRY.values()} == {"vision", "text"}
+    assert len({s.default for s in models.REGISTRY.values()}) == 2
+
+
+def test_every_registered_model_has_a_live_call_site():
+    """A routing table row nobody calls is decoration. This is the test that
+    keeps the registry honest — adding a row means wiring it, or the claim
+    that we route work across model classes stops being checkable."""
+    import services.extract.transcript as t
+    import services.extract.vision as v
+
+    assert {t.TASK, v.TASK} == set(models.REGISTRY)
 
 
 def test_env_var_overrides_the_default(monkeypatch):

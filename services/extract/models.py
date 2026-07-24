@@ -1,33 +1,36 @@
 """The model registry: which model does which job, and why.
 
-This file is the architecture argument in one page. Meridian does not call
-"an LLM" — it routes each task to the smallest model that can do that task,
-across four different model classes:
+Two inputs, two model classes, one page:
 
-    task                 class        why not something bigger / smaller
-    -------------------  -----------  ------------------------------------
-    referral_vision      vision       a scanned fax is an image; checkbox
-                                      state and margin handwriting do not
-                                      survive OCR-to-text at all
-    transcript_extract   compact text closed-form facts from one call; the
-                                      job is negation scope, not reasoning
-    escalated_extract    large text   only for documents the compact model
-                                      returned low confidence on
-    criteria_embed       embedding    retrieve payer criteria by meaning
-    criteria_rerank      reranker     order retrieved criteria by fit
+    input                task                model class   reads
+    -------------------  ------------------  ------------  ------------------
+    any uploaded file    referral_vision      vision       the page itself
+    audio transcript     transcript_extract   compact text what was said
 
-Why this is a platform argument rather than a vendor preference: all five
-classes are open-weight models behind one OpenAI-compatible API. Swapping
-the vision model, or promoting the compact extractor a size class after an
-eval says to, is an env var — not an integration project. `evals/
-extraction_ab.py` already exercises exactly that for the text extractor and
-picked deepseek-v4-flash over -pro on measured verdict preservation, not on
-vibes.
+Deliberately only two. Every entry here has a live call site; a registry
+row without one is decoration, and a routing table nobody can verify is
+worse than no routing table. Embedding/reranking for payer criteria and a
+large-model escalation tier were both considered and cut — they were
+plausible rows with no caller.
 
-Every id here is overridable by env var, because model availability on any
-account is a deployment fact, not a source-code fact. Verify against your
-own account before a demo: an id that 404s fails closed to ESCALATE, which
-is safe but looks like a broken pipeline.
+Note what is NOT here: an arbiter. When the two readers disagree,
+services/extract/reconcile.py settles it by running app.rule_engine over
+the candidate readings. That is deterministic and points at a rule; a model
+opinion in that slot would be strictly less defensible than the mechanism
+it replaced.
+
+Why this is a platform argument rather than a vendor preference: both are
+open-weight models behind one OpenAI-compatible API, so swapping the vision
+model or promoting the text extractor a size class after an eval says to is
+an env var, not an integration project. evals/extraction_ab.py already did
+exactly that for the text extractor and picked deepseek-v4-flash over -pro
+on measured verdict preservation rather than on vibes.
+
+Every id is overridable by env var, because model availability on an
+account is a deployment fact, not a source-code fact — kimi-k2p5 404s and
+glm-5p2 rejects images outright, both found by calling them rather than by
+reading a docs page. An id that 404s fails closed to ESCALATE: safe, but on
+stage indistinguishable from a broken pipeline. Check before demoing.
 """
 
 from __future__ import annotations
@@ -69,10 +72,13 @@ REGISTRY: dict[str, ModelSpec] = {
         modality="vision",
         env_var="FIREWORKS_VISION_MODEL",
         why=(
-            "A faxed referral is a page image, not text. Ticked checkboxes, "
-            "margin handwriting, and which value sits under which field label "
-            "are exactly what OCR-to-text discards — and a dropped checkbox is "
-            "a dropped red flag."
+            "Reads every uploaded file — referral faxes, insurance cards, "
+            "patient-uploaded medical history — as a page rather than as a "
+            "transcription of one. Measured on the demo fax: tesseract "
+            "renders ticked boxes as 'I/]' and drops unticked ones entirely, "
+            "so the text reader returns null for every absent feature while "
+            "this one reads them off the page. A dropped checkbox is a "
+            "dropped red flag."
         ),
     ),
     "transcript_extract": ModelSpec(
@@ -81,45 +87,13 @@ REGISTRY: dict[str, ModelSpec] = {
         modality="text",
         env_var="FIREWORKS_TRANSCRIPT_MODEL",
         why=(
-            "Reading closed-form answers out of one call transcript. The hard "
-            "part is negation scope ('nope, apart from the bleeding'), not "
-            "reasoning depth, so a compact model is the right size. Matches "
-            "the model evals/extraction_ab.py measured as best on "
+            "Reads audio transcripts — what the patient actually said on the "
+            "intake call. The hard part is negation scope, not reasoning "
+            "depth: the keyword parser reads 'nope, apart from the bleeding' "
+            "as no bleeding at confidence 0.9, and this model reads it "
+            "correctly. Verified live. A compact model is the right size, and "
+            "evals/extraction_ab.py measured it beating the larger one on "
             "verdict_preserved."
-        ),
-    ),
-    "escalated_extract": ModelSpec(
-        task="escalated_extract",
-        default=f"{_PREFIX}/deepseek-v4-pro",
-        modality="text",
-        env_var="FIREWORKS_ESCALATED_MODEL",
-        why=(
-            "Second pass for documents the compact extractor returned low "
-            "confidence on. Deliberately NOT used to adjudicate disagreements "
-            "— app.rule_engine settles those deterministically, and a model "
-            "opinion there would be less auditable than the rule it replaced."
-        ),
-    ),
-    "criteria_embed": ModelSpec(
-        task="criteria_embed",
-        default=f"{_PREFIX}/qwen3-embedding-8b",
-        modality="embedding",
-        env_var="FIREWORKS_EMBED_MODEL",
-        why=(
-            "Payer policy is written in the payer's words, not the chart's. "
-            "Retrieving the criteria a packet must satisfy is a similarity "
-            "problem, and a generative model is the wrong tool for it."
-        ),
-    ),
-    "criteria_rerank": ModelSpec(
-        task="criteria_rerank",
-        default=f"{_PREFIX}/qwen3-reranker-8b",
-        modality="rerank",
-        env_var="FIREWORKS_RERANK_MODEL",
-        why=(
-            "Embedding recall is broad; a PA packet should cite the two or "
-            "three criteria that actually apply. Reranking is a scoring task, "
-            "so it gets a scoring model."
         ),
     ),
 }

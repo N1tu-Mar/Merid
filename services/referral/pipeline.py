@@ -91,7 +91,7 @@ def process_referral(
         return _persist(referral_id, source, raw_text, patient_name, ReferralFeatures(), _escalate_verdict(referral_id, "document_unparseable_empty_text"), **sb)
 
     try:
-        perception = perceive_document(raw_text, parse.page_images)
+        perception = perceive_document(raw_text, parse.page_images, source=source)
     except (PerceptionError, ExtractionError) as e:
         return _persist(referral_id, source, raw_text, patient_name, ReferralFeatures(), _escalate_verdict(referral_id, f"extraction_error: {e}"), **sb)
     except Exception as e:
