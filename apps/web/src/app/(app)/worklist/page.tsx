@@ -66,6 +66,7 @@ export default function WorklistPage() {
                 <th className="px-4 py-2 font-medium">Source</th>
                 <th className="px-4 py-2 font-medium">Urgency</th>
                 <th className="px-4 py-2 font-medium">Disposition</th>
+                <th className="px-4 py-2 font-medium">Insurance</th>
                 <th className="px-4 py-2 font-medium">Received</th>
                 <th className="px-4 py-2 font-medium">Status</th>
               </tr>
@@ -124,6 +125,24 @@ export default function WorklistPage() {
                   <td className="px-4 py-3">
                     {item.verdict ? (
                       <DispositionBadge disposition={item.verdict.disposition} />
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.coverage ? (
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-xs text-slate-600 dark:text-slate-300">
+                          {item.coverage.plan.replace(" (synthetic)", "")}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider ${
+                            item.coverage.pa_required ? "text-amber-600" : "text-emerald-600"
+                          }`}
+                        >
+                          {item.coverage.pa_required ? "PA required" : "no PA"} · {item.coverage.est_patient_share}
+                        </span>
+                      </span>
                     ) : (
                       <span className="text-slate-400">—</span>
                     )}

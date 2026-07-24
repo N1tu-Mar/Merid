@@ -49,6 +49,7 @@ export interface SandboxInfo {
 export interface ReferralWorklistItem {
   referral_id: string;
   patient_name: string;
+  coverage?: CoverageMatch;
   source: string;
   raw_text: string;
   created_at: string;

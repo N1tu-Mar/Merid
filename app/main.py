@@ -200,11 +200,14 @@ def _latest_verdict(session, referral_id: str) -> TriageVerdictRecord | None:
 
 
 def _worklist_item(session, ref: ReferralRecord) -> dict:
+    from app.coverage import coverage_for
+
     verdict = _latest_verdict(session, ref.id)
     features = ReferralFeatures.model_validate_json(ref.features_json)
     return {
         "referral_id": ref.id,
         "patient_name": ref.patient_name,
+        "coverage": coverage_for(ref.id),
         "source": ref.source,
         "raw_text": ref.raw_text,
         "created_at": ref.created_at.isoformat(),
