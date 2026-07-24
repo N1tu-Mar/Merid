@@ -132,15 +132,30 @@ try:
             text = "\\n".join((page.extract_text() or "") for page in reader.pages)
         except Exception:
             text = ""
+        rendered = []
         try:
             import pypdfium2 as pdfium
             doc = pdfium.PdfDocument(io.BytesIO(data))
             for i in range(min(len(doc), MAX_RASTER_PAGES)):
                 page = doc[i]
-                if not add_page(to_png(page.render(scale=RASTER_SCALE).to_pil())):
+                pil = page.render(scale=RASTER_SCALE).to_pil()
+                if not add_page(to_png(pil)):
                     break
+                rendered.append(pil)
         except Exception:
             images = []
+            rendered = []
+
+        # A scanned fax is a PDF with no text layer, so pypdf returns
+        # nothing. OCR the pages we just rendered instead — that is what the
+        # text reader would otherwise be handed by a real fax pipeline, and
+        # without it a scan silently has only one reader instead of two.
+        if not text.strip() and rendered:
+            try:
+                import pytesseract
+                text = "\\n".join(pytesseract.image_to_string(p) for p in rendered)
+            except Exception:
+                text = ""
     elif filename.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp")):
         from PIL import Image
         pil = Image.open(io.BytesIO(data))

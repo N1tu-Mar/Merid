@@ -52,6 +52,14 @@ VISION_TIMEOUT_S = float(os.environ.get("FIREWORKS_VISION_TIMEOUT_S", "120"))
 VISION_MAX_EDGE_PX = int(os.environ.get("FIREWORKS_VISION_MAX_EDGE", "1600"))
 VISION_JPEG_QUALITY = int(os.environ.get("FIREWORKS_VISION_JPEG_QUALITY", "85"))
 
+# A page read needs a bigger output budget than a transcript read: it quotes
+# form labels, checkbox states, and handwriting across a whole page, and
+# source_refs is a free-form object the decoder will happily fill. Measured
+# hitting finish_reason=length at the 8192 default on a single fax page —
+# which fails closed to ESCALATE, so the symptom is a document that "cannot
+# be read" rather than an obvious error.
+VISION_MAX_TOKENS = int(os.environ.get("FIREWORKS_VISION_MAX_TOKENS", "24576"))
+
 # Guard against a caller handing over a 200-page upload: the request would
 # time out and fail closed, which is safe but wastes the attempt. Fail fast
 # and let a human triage the document set instead.
@@ -123,6 +131,7 @@ def extract_from_images(
         schema=features_schema(),
         schema_name="ReferralFeatures",
         timeout_s=VISION_TIMEOUT_S,
+        max_tokens=VISION_MAX_TOKENS,
     )
 
     features = to_features(result.data)

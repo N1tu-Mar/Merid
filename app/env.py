@@ -33,4 +33,33 @@ def load_env(path: Path = _ENV_PATH) -> None:
             os.environ[key] = value
 
 
+def ensure_ca_bundle() -> None:
+    """Point the stdlib/requests TLS stack at certifi when the OS has no
+    default CA file.
+
+    On a python.org macOS install `ssl.get_default_verify_paths().cafile` is
+    None until "Install Certificates.command" has been run. httpx bundles
+    certifi so Fireworks calls work regardless, but the Daytona SDK goes
+    through urllib3/requests, which fall back to that empty default and fail
+    every sandbox create with CERTIFICATE_VERIFY_FAILED — read as "Daytona
+    is down" rather than "this laptop has no trust store".
+
+    This does not weaken verification: it selects certifi's standard CA
+    bundle, the same set requests would normally use. Never overrides an
+    operator's own setting.
+    """
+    import ssl
+
+    if ssl.get_default_verify_paths().cafile:
+        return
+    try:
+        import certifi
+    except ImportError:
+        return
+    bundle = certifi.where()
+    for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"):
+        os.environ.setdefault(var, bundle)
+
+
 load_env()
+ensure_ca_bundle()
