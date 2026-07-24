@@ -27,11 +27,12 @@ with no key at all, and it announces itself loudly when it fires.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 
 from app.tracing import log_span, traced
 
@@ -55,7 +56,19 @@ DAYTONA_SANDBOX_IMAGE = os.environ.get("DAYTONA_SANDBOX_IMAGE")
 # expects. Bumping the suffix (":2", ":3", ...) when the parsing recipe in
 # _parsing_image() changes gives you a pinnable, auditable "which OS parsed
 # this" version — the same discipline as pinning rule_version to a verdict.
-DEFAULT_SNAPSHOT_NAME = "meridian-parse:1"
+# :2 adds pypdfium2 for page rasterisation (see RASTER_* below).
+DEFAULT_SNAPSHOT_NAME = "meridian-parse:2"
+
+# Rasterisation budget. Page images cross back as base64 on the sandbox's
+# stdout, so this is bounded on three axes rather than trusting the document:
+# how many pages, how big each is rendered, and the total payload. A document
+# that blows the budget yields the pages that fit — the rest is a human's
+# problem, which is the correct outcome for a 200-page upload anyway.
+MAX_RASTER_PAGES = int(os.environ.get("DAYTONA_MAX_RASTER_PAGES", "6"))
+# 2.0 ≈ 144 DPI: enough to resolve a ticked checkbox and margin handwriting,
+# which is the whole reason the vision path exists.
+RASTER_SCALE = float(os.environ.get("DAYTONA_RASTER_SCALE", "2.0"))
+RASTER_BUDGET_BYTES = int(os.environ.get("DAYTONA_RASTER_BUDGET_BYTES", str(8 * 1024 * 1024)))
 
 # Belt-and-suspenders: a hard time-to-live so a box orphaned by a crashed API
 # process self-destructs instead of lingering as cost + attack surface. Our
@@ -89,22 +102,63 @@ def decode_text(raw):
     except UnicodeDecodeError:
         return raw.decode("latin-1", errors="replace")
 
+def to_png(pil_image):
+    # Re-encoding through PIL means the bytes that cross back are generated
+    # by our own code, not carried in from the document. A malformed JPEG
+    # that might trip a downstream decoder does not survive the round trip.
+    buf = io.BytesIO()
+    pil_image.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
 text = ""
+images = []
+budget = RASTER_BUDGET_BYTES
+
+def add_page(png):
+    global budget
+    if len(png) > budget:
+        return False
+    budget -= len(png)
+    images.append(base64.b64encode(png).decode("ascii"))
+    return True
+
 try:
     if filename.endswith(".pdf"):
-        from pypdf import PdfReader
-        reader = PdfReader(io.BytesIO(data))
-        text = "\\n".join((page.extract_text() or "") for page in reader.pages)
-    elif filename.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp")):
-        import pytesseract
+        # Text first and independently: the existing text extractor still
+        # depends on it, so a rasterisation failure must not cost us both.
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
+            text = "\\n".join((page.extract_text() or "") for page in reader.pages)
+        except Exception:
+            text = ""
+        try:
+            import pypdfium2 as pdfium
+            doc = pdfium.PdfDocument(io.BytesIO(data))
+            for i in range(min(len(doc), MAX_RASTER_PAGES)):
+                page = doc[i]
+                if not add_page(to_png(page.render(scale=RASTER_SCALE).to_pil())):
+                    break
+        except Exception:
+            images = []
+    elif filename.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp")):
         from PIL import Image
-        text = pytesseract.image_to_string(Image.open(io.BytesIO(data)))
+        pil = Image.open(io.BytesIO(data))
+        add_page(to_png(pil))
+        # OCR is best-effort now: it is a fallback for the text extractor,
+        # not the primary read. The vision model reads the image itself.
+        try:
+            import pytesseract
+            text = pytesseract.image_to_string(pil)
+        except Exception:
+            text = ""
     else:
         text = decode_text(data)
 except Exception:  # decode failure inside the box -> empty -> ESCALATE
     text = ""
+    images = []
 
-print(json.dumps({"text": text}))
+print(json.dumps({"text": text, "images": images}))
 """
 
 
@@ -123,10 +177,17 @@ class SandboxParseResult:
     sandbox_id: str | None  # None on the unsandboxed local fallback
     duration_ms: int | None
     sandboxed: bool
-    # Which OS actually did the decode: "snapshot:meridian-parse:1",
+    # Which OS actually did the decode: "snapshot:meridian-parse:2",
     # "image:<ref>", or "declarative-build". None on the local fallback (no
     # sandbox OS involved). This is the auditable "what parsed this document".
     sandbox_source: str | None = None
+    # Rendered page images, PNG bytes, in page order. Feeds the vision
+    # extractor (services/extract/vision.py), which reads the page as a page
+    # rather than reading OCR's flattening of it. Empty for plain-text
+    # documents, on the local fallback, and whenever rasterisation failed —
+    # `text` is unaffected either way, so a rasterisation failure degrades
+    # the vision path without taking the text path down with it.
+    page_images: list[bytes] = dc_field(default_factory=list)
 
 
 @traced
@@ -165,6 +226,7 @@ def parse_document_in_sandbox(content: bytes, filename: str) -> SandboxParseResu
     source_label = _sandbox_source_label()
     outcome = "error"
     text = ""
+    page_images: list[bytes] = []
     duration_ms: int | None = None
     started = time.monotonic()
     try:
@@ -183,6 +245,7 @@ def parse_document_in_sandbox(content: bytes, filename: str) -> SandboxParseResu
         if "text" not in output:
             raise SandboxError("sandbox output missing 'text'")
         text = output["text"]
+        page_images = _decode_page_images(output.get("images", []))
         outcome = "ok"
     except SandboxError:
         raise
@@ -231,6 +294,7 @@ def parse_document_in_sandbox(content: bytes, filename: str) -> SandboxParseResu
             "duration_ms": duration_ms,
             "network_block_all": True,
             "ephemeral": True,
+            "pages_rasterised": len(page_images),
         }
     )
     return SandboxParseResult(
@@ -239,7 +303,32 @@ def parse_document_in_sandbox(content: bytes, filename: str) -> SandboxParseResu
         duration_ms=duration_ms,
         sandboxed=True,
         sandbox_source=source_label,
+        page_images=page_images,
     )
+
+
+def _decode_page_images(encoded: object) -> list[bytes]:
+    """Decode the base64 page images the sandbox printed.
+
+    Deliberately lenient: a page that will not decode is dropped with a
+    warning rather than failing the whole parse. The text path is unaffected
+    by rasterisation trouble, and losing the vision read is a degradation,
+    not a reason to escalate a document we successfully decoded.
+    """
+    if not isinstance(encoded, list):
+        log.warning("sandbox_images_not_a_list", extra={"type": type(encoded).__name__})
+        return []
+
+    pages: list[bytes] = []
+    for index, item in enumerate(encoded):
+        if not isinstance(item, str):
+            log.warning("sandbox_image_not_a_string", extra={"page": index})
+            continue
+        try:
+            pages.append(base64.b64decode(item, validate=True))
+        except (ValueError, TypeError):
+            log.warning("sandbox_image_undecodable", extra={"page": index})
+    return pages
 
 
 def _sandbox_source_label() -> str:
@@ -296,14 +385,21 @@ def _parsing_image():
     """The declarative parsing OS. Built once by Daytona, then cached.
 
     pypdf/pillow/pytesseract are the Python side; tesseract-ocr is the system
-    binary pytesseract shells out to. Baking them into the image means the
-    running sandbox needs no network (see network_block_all above).
+    binary pytesseract shells out to. pypdfium2 renders PDF pages to images
+    for the vision extractor — it ships its own PDFium binary, so unlike
+    pdf2image it needs no poppler installed alongside it.
+
+    Baking all of it into the image means the running sandbox needs no
+    network (see network_block_all above).
+
+    Changing anything here invalidates the published snapshot: bump
+    DEFAULT_SNAPSHOT_NAME and re-run services/referral/build_snapshot.py.
     """
     from daytona import Image
 
     return (
         Image.debian_slim("3.11")
-        .pip_install("pypdf", "pillow", "pytesseract")
+        .pip_install("pypdf", "pillow", "pytesseract", "pypdfium2")
         .run_commands(
             "apt-get update",
             "apt-get install -y --no-install-recommends tesseract-ocr",
@@ -317,13 +413,16 @@ def _build_script(content: bytes, filename: str) -> str:
 
     json.dumps produces safely-escaped Python string literals, so document
     bytes/filename can never break out of the assignment into executable code.
+    The rasterisation limits are injected the same way — they are ints/floats
+    we control, never anything derived from the document.
     """
-    import base64
-
     content_b64 = base64.b64encode(content).decode("ascii")
     preamble = (
         f"CONTENT_B64 = {json.dumps(content_b64)}\n"
         f"FILENAME = {json.dumps(filename)}\n"
+        f"MAX_RASTER_PAGES = {int(MAX_RASTER_PAGES)}\n"
+        f"RASTER_SCALE = {float(RASTER_SCALE)}\n"
+        f"RASTER_BUDGET_BYTES = {int(RASTER_BUDGET_BYTES)}\n"
     )
     return preamble + _SANDBOX_SCRIPT
 
