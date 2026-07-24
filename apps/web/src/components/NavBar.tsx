@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Two-sided nav: the demo is one system with two doors. Prior auth is a
+// step inside the doctor flow (see FlowStrip), not a top-level destination.
 const LINKS = [
-  { href: "/intake", label: "Intake Line" },
-  { href: "/worklist", label: "Worklist" },
-  { href: "/pa-packets", label: "PA Packets" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/intake", label: "Patient", activeOn: ["/intake"] },
+  { href: "/worklist", label: "Doctor", activeOn: ["/worklist", "/pa-packets", "/dashboard"] },
 ];
 
 export default function NavBar() {
@@ -21,12 +21,12 @@ export default function NavBar() {
             Meridian
           </span>
           <span className="hidden text-xs font-medium text-slate-400 sm:inline">
-            books the scope · never plays doctor
+            the end of &ldquo;please hold&rdquo;
           </span>
         </Link>
         <ul className="flex items-center gap-1">
           {LINKS.map((link) => {
-            const active = pathname?.startsWith(link.href);
+            const active = link.activeOn.some((p) => pathname?.startsWith(p));
             return (
               <li key={link.href}>
                 <Link

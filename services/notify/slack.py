@@ -117,13 +117,6 @@ def notify_verdict_approved(
             )
             return {"status": "skipped_below_threshold", "urgency": urgency}
 
-        if not WEBHOOK_URL:
-            log.info(
-                "slack_notify_skipped_no_webhook",
-                extra={"referral_id": referral_id},
-            )
-            return {"status": "skipped_no_webhook"}
-
         text = build_message(
             referral_id=referral_id,
             verdict_id=verdict_id,
@@ -134,7 +127,9 @@ def notify_verdict_approved(
             booked_slot=booked_slot,
         )
 
-        # Invariant #2, fail-closed: a filter error blocks the post.
+        # Invariant #2, fail-closed: a filter error blocks the post. The
+        # filter runs BEFORE the webhook check so even the no-webhook
+        # "preview" path never carries an unfiltered string to the UI.
         try:
             result = check_output(text)
         except Exception:
@@ -147,13 +142,23 @@ def notify_verdict_approved(
             )
             return {"status": "blocked_by_output_filter", "reasons": result.reasons}
 
+        if not WEBHOOK_URL:
+            # No webhook configured: return the filtered message as a
+            # preview so the worklist can show exactly what WOULD have
+            # posted to the care-team channel.
+            log.info(
+                "slack_notify_skipped_no_webhook",
+                extra={"referral_id": referral_id},
+            )
+            return {"status": "skipped_no_webhook", "preview": text}
+
         resp = httpx.post(WEBHOOK_URL, json={"text": text}, timeout=TIMEOUT_SECONDS)
         resp.raise_for_status()
         log.info(
             "slack_notify_sent",
             extra={"referral_id": referral_id, "urgency": urgency},
         )
-        return {"status": "sent"}
+        return {"status": "sent", "preview": text}
 
     except Exception as e:
         # Approval already committed — a notification failure must never

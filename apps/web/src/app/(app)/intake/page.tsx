@@ -48,6 +48,23 @@ const QUESTIONS: { field: string; prompt: string }[] = [
   },
 ];
 
+// Synthetic plan table mirroring app/coverage.py — coverage runs after the
+// clinical verdict and can never change urgency.
+const PLANS: { name: string; share: string; pa: boolean }[] = [
+  { name: "Aurora PPO (synthetic)", share: "$150–$400", pa: true },
+  { name: "Granite HMO (synthetic)", share: "$250–$600", pa: true },
+  { name: "Harbor Medicare Advantage (synthetic)", share: "$0–$150", pa: false },
+];
+
+// Synthetic clinics for the patient-side options view. Distances are fixed
+// demo values — the point is the shape of the choice a patient never gets
+// today: where, when, and roughly what it costs, before hanging up.
+const CLINICS: { name: string; miles: number; nextDay: string }[] = [
+  { name: "Midtown Endoscopy Center", miles: 1.2, nextDay: "earliest slot" },
+  { name: "Riverside GI Associates", miles: 3.8, nextDay: "+1 day" },
+  { name: "University Medical Center GI", miles: 7.5, nextDay: "+2 days" },
+];
+
 const DEMO_ANSWERS: Record<string, string> = {
   age: "I'm 42",
   rectal_bleeding: "yes",
@@ -64,6 +81,7 @@ const DEMO_ANSWERS: Record<string, string> = {
 
 export default function IntakePage() {
   const [patientName, setPatientName] = useState("Alex Rivera");
+  const [plan, setPlan] = useState(PLANS[0]);
   const [answers, setAnswers] = useState<Record<string, string>>(DEMO_ANSWERS);
   const [result, setResult] = useState<IntakeCallResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,8 +125,22 @@ export default function IntakePage() {
             type="text"
             value={patientName}
             onChange={(e) => setPatientName(e.target.value)}
-            className="mt-1 mb-4 w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
+            className="mt-1 mb-3 w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
           />
+          <label className="block text-xs font-medium text-slate-500">
+            Insurance plan (asked on the call — checked after the clinical verdict, never before)
+          </label>
+          <select
+            value={plan.name}
+            onChange={(e) => setPlan(PLANS.find((p) => p.name === e.target.value) ?? PLANS[0])}
+            className="mt-1 mb-4 w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
+          >
+            {PLANS.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
           <div className="space-y-3">
             {QUESTIONS.map((q) => (
               <div key={q.field}>
@@ -122,10 +154,17 @@ export default function IntakePage() {
               </div>
             ))}
           </div>
+          <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500 dark:bg-slate-950">
+            Why these 11 questions? They&apos;re the red-flag set behind NICE
+            NG12&apos;s referral criteria, with thresholds measured on 2,093
+            real primary-care patients (Hamilton et&nbsp;al., CAPER, 2005).
+            Every &quot;yes&quot; maps to a written rule you can read — no
+            question is decorative.
+          </p>
           <button
             onClick={placeCall}
             disabled={busy}
-            className="mt-5 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "On the call…" : "📞 Place call"}
           </button>
@@ -160,6 +199,35 @@ export default function IntakePage() {
                   </a>{" "}
                   for sign-off
                 </p>
+                {result.booked_slot && (
+                  <div className="mt-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Your options{" "}
+                      <span className="normal-case text-slate-400">
+                        — by distance, with your estimated share on {plan.name.replace(" (synthetic)", "")}
+                        {" "}(synthetic clinics, demo)
+                      </span>
+                    </h3>
+                    <ul className="mt-2 space-y-2">
+                      {CLINICS.map((c, i) => (
+                        <li
+                          key={c.name}
+                          className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm ${
+                            i === 0
+                              ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950"
+                              : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                          }`}
+                        >
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-xs text-slate-500">
+                            {c.miles} mi · {c.nextDay} · est. {plan.share}
+                            {plan.pa ? " · prior auth handled for you" : " · no prior auth needed"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
               <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">

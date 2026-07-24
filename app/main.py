@@ -364,6 +364,7 @@ def approve_verdict(referral_id: str, verdict_id: str, body: ApproveRequest) -> 
             "approval_hash": approval_hash,
             "approved_at": approved_at.isoformat(),
             "slack": notify_result.get("status"),
+            "slack_preview": notify_result.get("preview"),
             "calendar": calendar_result.get("status"),
         }
         # When a bookable .ics was produced, expose a download link. The event

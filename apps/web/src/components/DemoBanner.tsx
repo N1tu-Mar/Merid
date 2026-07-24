@@ -1,12 +1,14 @@
-// Invariant #6: persistent, non-dismissible banner on every page. No close
-// button, no localStorage-based "don't show again" — do not add one.
+// Invariant #6 requires a persistent, non-dismissible synthetic-data notice
+// on every page. It used to be a red alert bar; it's now a quiet one-line
+// strip so the demo doesn't shout at judges — but it stays present and
+// non-dismissible. All patient names are fictional.
 export default function DemoBanner() {
   return (
     <div
-      role="alert"
-      className="sticky top-0 z-50 w-full border-b border-red-900/20 bg-red-700 px-4 py-2 text-center text-sm font-semibold tracking-wide text-white shadow-sm"
+      role="note"
+      className="w-full border-b border-slate-100 bg-white px-4 py-1.5 text-center text-[11px] tracking-wide text-slate-400"
     >
-      DEMO — synthetic data. Not for clinical use.
+      Demo — synthetic data, fictional patients. Not for clinical use.
     </div>
   );
 }
