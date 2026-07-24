@@ -70,9 +70,8 @@ export default function Home() {
             </span>
           </span>
           <div className="flex items-center gap-6 text-sm text-slate-500">
-            <Link href="/intake" className="hover:text-slate-900">Intake Line</Link>
-            <Link href="/worklist" className="hover:text-slate-900">Worklist</Link>
-            <Link href="/dashboard" className="hover:text-slate-900">Dashboard</Link>
+            <Link href="/intake" className="hover:text-slate-900">Patient side</Link>
+            <Link href="/worklist" className="hover:text-slate-900">Doctor side</Link>
           </div>
         </nav>
       </header>
